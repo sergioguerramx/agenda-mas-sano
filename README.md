@@ -6,31 +6,49 @@ Aplicacion web para agenda de citas de Mas Sano Nutricion Holistica.
 
 Esta fase deja la base inicial lista para revision:
 
-- Proyecto Next.js con estructura limpia.
-- Agenda publica mobile-first con seleccion de fecha, horario, datos y confirmacion.
-- Estilo visual calido, pastel, suave, limpio y profesional.
-- Panel interno en `/panel` preparado para Supabase Auth con Google.
-- Lista mock de citas con filtro por fecha y estado, cambio de estado y copiado de WhatsApp.
-- Reglas base de horarios y validacion de WhatsApp mexicano.
+- Agenda publica mobile-first.
+- Seleccion de fecha y horario.
+- Captura de nombre, apellidos y WhatsApp.
+- Confirmacion visual y boton de WhatsApp.
+- Panel interno en `/panel`.
+- Login preparado para Supabase Auth con Google.
+- Lista mock de citas con filtros y cambio de estado.
 - Esquema SQL inicial para Supabase.
 - Placeholders para Google Calendar, Google Contacts y Resend.
+- Configuracion preparada para conectar Supabase en la siguiente fase.
 
 Todavia no conecta servicios reales ni usa claves privadas.
 
 ## Correr localmente
+
+Requisito: Node.js 20.9 o superior.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abrir `http://localhost:3000` y `http://localhost:3000/panel`.
+Abrir `http://localhost:3000` para la agenda publica y `http://localhost:3000/panel` para el panel interno.
 
 ## Variables pendientes
 
-Crear `.env.local` a partir de `.env.example` cuando se conecten servicios reales. No subir secretos al repositorio.
+Crear un archivo `.env.local` a partir de `.env.example` cuando se vaya a conectar la siguiente fase.
 
-Variables preparadas: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CONTACTS_GROUP_ID`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_WHATSAPP_PHONE`.
+Variables preparadas:
+
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_ID`
+- `GOOGLE_CONTACTS_GROUP_ID`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `NEXT_PUBLIC_WHATSAPP_PHONE`
+
+No se deben subir secretos reales al repositorio.
 
 ## Reglas de agenda
 
@@ -44,12 +62,65 @@ Variables preparadas: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 ## WhatsApp
 
-Acepta 10 digitos mexicanos, tolera `+52`, espacios y guiones, y normaliza a `+52`.
+La app acepta numeros mexicanos de 10 digitos. Tambien tolera `+52`, espacios y guiones. Internamente se normaliza a formato `+52`.
 
 ## Supabase
 
-Ejecutar `supabase/schema.sql`, activar Google en Supabase Auth, llenar variables de Supabase y reemplazar datos mock por consultas reales. Supabase sera la fuente principal de verdad.
+El archivo `supabase/schema.sql` contiene las tablas iniciales:
 
-## Google Calendar, Google Contacts, Resend y Vercel
+- `appointments`
+- `admin_users`
 
-Los archivos en `src/services` quedan como placeholders. En la siguiente fase se deben crear credenciales reales, guardar las variables en el entorno de Vercel, conectar eventos de calendario, contactos y correos, y guardar los identificadores externos en `appointments`.
+Tambien agrega los correos permitidos para el panel:
+
+- `info.mas.sano@gmail.com`
+- `ms.suc.puentes@gmail.com`
+
+Para conectar Supabase en la siguiente fase:
+
+1. Crear el proyecto en Supabase.
+2. Ejecutar `supabase/schema.sql`.
+3. Activar Google como proveedor de autenticacion.
+4. Completar las variables de Supabase en `.env.local`.
+5. Reemplazar los datos mock por consultas reales a Supabase.
+6. Mantener Supabase como fuente principal de verdad para citas y administradores.
+
+## Google Calendar
+
+El archivo `src/services/google-calendar.ts` contiene un placeholder. En la siguiente fase se debe:
+
+1. Crear credenciales OAuth en Google Cloud.
+2. Guardar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_CALENDAR_ID`.
+3. Crear eventos al confirmar una cita.
+4. Guardar el id del evento en `appointments.google_calendar_event_id`.
+5. Manejar cambios o cancelaciones actualizando el evento existente.
+
+## Google Contacts
+
+El archivo `src/services/google-contacts.ts` contiene un placeholder. En la siguiente fase se debe:
+
+1. Activar People API en Google Cloud.
+2. Guardar el grupo de contactos en `GOOGLE_CONTACTS_GROUP_ID`.
+3. Crear o actualizar el contacto del paciente.
+4. Guardar el id del contacto en `appointments.google_contact_id`.
+5. Evitar duplicados buscando por WhatsApp antes de crear un contacto nuevo.
+
+## Resend
+
+El archivo `src/services/resend.ts` contiene un placeholder. En la siguiente fase se debe:
+
+1. Crear cuenta y dominio en Resend.
+2. Guardar `RESEND_API_KEY` y `RESEND_FROM_EMAIL`.
+3. Enviar confirmaciones de cita.
+4. Guardar el id del envio en `appointments.resend_email_id`.
+5. Agregar plantillas de correo para confirmacion, cambio y cancelacion.
+
+## Vercel
+
+Para conectar Vercel despues:
+
+1. Importar el repositorio.
+2. Configurar las variables de entorno.
+3. Confirmar que el build corre correctamente.
+4. Usar Supabase como fuente principal de verdad.
+5. Publicar primero en preview y validar el flujo completo antes de produccion.
