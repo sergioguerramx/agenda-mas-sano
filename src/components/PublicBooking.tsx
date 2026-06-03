@@ -3,12 +3,13 @@
 import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
-import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabaseConfig, isSupabaseConfigured } from "@/lib/supabase";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
+type SlotCountRow = { appointment_time: string; active_count: number };
 
 const emptyDraft: AppointmentDraft = {
   firstName: "",
@@ -26,6 +27,36 @@ function logSupabaseError(context: string, supabaseError: unknown) {
     details: safeError.details,
     hint: safeError.hint
   });
+}
+
+async function callPublicRpc<T>(functionName: string, payload: Record<string, unknown>) {
+  const config = getSupabaseConfig();
+
+  if (!config.url || !config.anonKey) {
+    throw new Error("Falta conectar Supabase.");
+  }
+
+  const response = await fetch(`${config.url.replace(/\/+$/, "")}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      apikey: config.anonKey,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as SupabaseSafeError & { error?: string };
+    const message = body.message ?? body.error ?? body.details ?? `Supabase respondio con error ${response.status}.`;
+    const error = new Error(message) as Error & SupabaseSafeError;
+    error.code = body.code;
+    error.details = body.details;
+    error.hint = body.hint;
+    throw error;
+  }
+
+  return (await response.json().catch(() => undefined)) as T;
 }
 
 export function PublicBooking() {
@@ -56,17 +87,15 @@ export function PublicBooking() {
       setError("");
 
       try {
-        const supabase = createSupabaseBrowserClient();
-        const { data, error: supabaseError } = await supabase.rpc("public_slot_counts", {
+        const data = await callPublicRpc<SlotCountRow[]>("public_slot_counts", {
           start_date: draft.date,
           end_date: draft.date
         });
 
-        if (supabaseError) throw supabaseError;
         if (ignore) return;
 
         const nextSlots: ReservedSlots = {};
-        (data ?? []).forEach((row: { appointment_time: string; active_count: number }) => {
+        (data ?? []).forEach((row) => {
           nextSlots[row.appointment_time.slice(0, 5)] = Number(row.active_count);
         });
         setReservedSlots(nextSlots);
@@ -116,16 +145,13 @@ export function PublicBooking() {
     setError("");
 
     try {
-      const supabase = createSupabaseBrowserClient();
-      const { error: supabaseError } = await supabase.rpc("request_public_appointment", {
+      await callPublicRpc<void>("request_public_appointment", {
         p_first_name: draft.firstName.trim(),
         p_last_name: draft.lastName.trim(),
         p_whatsapp: whatsapp,
         p_appointment_date: draft.date,
         p_appointment_time: draft.time
       });
-
-      if (supabaseError) throw supabaseError;
 
       setStep("done");
     } catch (supabaseError) {
