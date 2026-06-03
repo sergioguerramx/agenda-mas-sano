@@ -1,8 +1,9 @@
 "use client";
 
 import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
-import { useMemo, useState } from "react";
-import { buildAvailableDates, buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
+import { useEffect, useMemo, useState } from "react";
+import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
+import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
@@ -19,13 +20,63 @@ const emptyDraft: AppointmentDraft = {
 export function PublicBooking() {
   const [step, setStep] = useState<Step>("date");
   const [draft, setDraft] = useState<AppointmentDraft>(emptyDraft);
+  const [reservedSlots, setReservedSlots] = useState<ReservedSlots>({});
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dates = useMemo(() => buildAvailableDates(new Date()), []);
-  const slots = useMemo(() => (draft.date ? buildSlotsForDate(draft.date, new Date()) : []), [draft.date]);
+  const slots = useMemo(() => (draft.date ? buildSlotsForDate(draft.date, new Date(), reservedSlots) : []), [draft.date, reservedSlots]);
   const selectedDate = dates.find((date) => date.iso === draft.date);
   const selectedSlot = slots.find((slot) => slot.time === draft.time);
 
-  function confirm() {
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadReservedSlots() {
+      if (!draft.date) return;
+
+      if (!isSupabaseConfigured()) {
+        setReservedSlots({});
+        setError("Falta conectar Supabase para ver horarios reales.");
+        return;
+      }
+
+      setLoadingSlots(true);
+      setError("");
+
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: supabaseError } = await supabase.rpc("public_slot_counts", {
+          start_date: draft.date,
+          end_date: draft.date
+        });
+
+        if (supabaseError) throw supabaseError;
+        if (ignore) return;
+
+        const nextSlots: ReservedSlots = {};
+        (data ?? []).forEach((row: { appointment_time: string; active_count: number }) => {
+          nextSlots[row.appointment_time.slice(0, 5)] = Number(row.active_count);
+        });
+        setReservedSlots(nextSlots);
+      } catch {
+        if (!ignore) {
+          setReservedSlots({});
+          setError("No se pudieron cargar los horarios disponibles. Intenta de nuevo.");
+        }
+      } finally {
+        if (!ignore) setLoadingSlots(false);
+      }
+    }
+
+    loadReservedSlots();
+
+    return () => {
+      ignore = true;
+    };
+  }, [draft.date]);
+
+  async function confirm() {
     const whatsapp = normalizeMexicanWhatsapp(draft.whatsapp);
 
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
@@ -38,9 +89,39 @@ export function PublicBooking() {
       return;
     }
 
+    if (!draft.date || !draft.time || !selectedSlot?.available) {
+      setError("Elige un horario disponible para continuar.");
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      setError("Falta conectar Supabase para guardar la cita.");
+      return;
+    }
+
+    setSaving(true);
     setDraft((current) => ({ ...current, whatsapp }));
     setError("");
-    setStep("done");
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: supabaseError } = await supabase.from("appointments").insert({
+        first_name: draft.firstName.trim(),
+        last_name: draft.lastName.trim(),
+        whatsapp,
+        appointment_date: draft.date,
+        appointment_time: draft.time,
+        status: "pending"
+      });
+
+      if (supabaseError) throw supabaseError;
+
+      setStep("done");
+    } catch {
+      setError("No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const waPhone = process.env.NEXT_PUBLIC_WHATSAPP_PHONE ?? "525512345678";
@@ -94,6 +175,7 @@ export function PublicBooking() {
                         key={date.iso}
                         onClick={() => {
                           setDraft({ ...draft, date: date.iso, time: "" });
+                          setError("");
                           setStep("time");
                         }}
                         type="button"
@@ -110,14 +192,17 @@ export function PublicBooking() {
                 <section>
                   <h3>Horarios disponibles</h3>
                   <p className="copy">{selectedDate?.label}</p>
+                  {loadingSlots && <p className="copy">Cargando horarios...</p>}
+                  {error && <p className="error">{error}</p>}
                   <div className="grid">
                     {slots.map((slot) => (
                       <button
                         className={`choice ${draft.time === slot.time ? "selected" : ""}`}
-                        disabled={!slot.available}
+                        disabled={!slot.available || loadingSlots || Boolean(error)}
                         key={slot.time}
                         onClick={() => {
                           setDraft({ ...draft, time: slot.time });
+                          setError("");
                           setStep("details");
                         }}
                         type="button"
@@ -142,15 +227,15 @@ export function PublicBooking() {
                   </div>
                   <div className="summary"><div className="row"><span>Fecha</span><strong>{draft.date ? formatDisplayDate(draft.date) : ""}</strong></div><div className="row"><span>Hora</span><strong>{draft.time}</strong></div></div>
                   {error && <p className="error">{error}</p>}
-                  <div className="actions"><button className="primary" onClick={confirm} type="button"><CheckCircle2 size={18} />Confirmar cita</button><button className="secondary" onClick={() => setStep("time")} type="button">Cambiar horario</button></div>
+                  <div className="actions"><button className="primary" disabled={saving} onClick={confirm} type="button"><CheckCircle2 size={18} />{saving ? "Guardando..." : "Confirmar cita"}</button><button className="secondary" onClick={() => { setError(""); setStep("time"); }} type="button">Cambiar horario</button></div>
                 </section>
               )}
 
               {step === "done" && (
                 <section className="success">
                   <CheckCircle2 size={42} />
-                  <h2>Cita lista para confirmar</h2>
-                  <p className="copy">En la siguiente fase se conectara Supabase, calendario, contactos y correo.</p>
+                  <h2>Cita solicitada</h2>
+                  <p className="copy">Recibimos tu solicitud. El equipo de Mas Sano le dara seguimiento por WhatsApp.</p>
                   <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div></div>
                   <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a><button className="secondary" onClick={() => { setDraft(emptyDraft); setStep("date"); }} type="button">Nueva cita</button></div>
                 </section>

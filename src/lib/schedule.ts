@@ -1,5 +1,6 @@
 export type AvailableDate = { iso: string; label: string; shortLabel: string; closed: boolean };
 export type Slot = { time: string; label: string; available: boolean; remaining: number };
+export type ReservedSlots = Record<string, number>;
 
 const MAX_DAYS_AHEAD = 15;
 const MIN_ADVANCE_MINUTES = 30;
@@ -13,8 +14,6 @@ const schedule: Record<number, Array<{ start: string; end: string }>> = {
   5: [{ start: "09:20", end: "13:20" }, { start: "15:00", end: "19:00" }],
   6: [{ start: "10:00", end: "15:00" }]
 };
-const mockReserved: Record<string, Record<string, number>> = {};
-
 export function buildAvailableDates(now: Date): AvailableDate[] {
   return Array.from({ length: MAX_DAYS_AHEAD + 1 }, (_, index) => {
     const date = new Date(now);
@@ -25,14 +24,14 @@ export function buildAvailableDates(now: Date): AvailableDate[] {
   });
 }
 
-export function buildSlotsForDate(dateIso: string, now: Date): Slot[] {
+export function buildSlotsForDate(dateIso: string, now: Date, reservedSlots: ReservedSlots = {}): Slot[] {
   const date = new Date(`${dateIso}T00:00:00`);
   return (schedule[date.getDay()] ?? []).flatMap((range) => {
     const slots: Slot[] = [];
     for (let cursor = toMinutes(range.start); cursor <= toMinutes(range.end); cursor += 20) {
       const time = fromMinutes(cursor);
       const slotDate = new Date(`${dateIso}T${time}:00`);
-      const reserved = mockReserved[dateIso]?.[time] ?? 0;
+      const reserved = reservedSlots[time] ?? 0;
       const available = reserved < MAX_APPOINTMENTS_PER_SLOT && slotDate.getTime() - now.getTime() >= MIN_ADVANCE_MINUTES * 60000;
       slots.push({ time, label: time, available, remaining: Math.max(MAX_APPOINTMENTS_PER_SLOT - reserved, 0) });
     }

@@ -60,3 +60,35 @@ for select using (email = auth.jwt() ->> 'email');
 create policy "Admins can manage appointments" on public.appointments
 for all using (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'))
 with check (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'));
+
+create policy "Public can request pending appointments" on public.appointments
+for insert
+with check (
+  status = 'pending'
+  and google_calendar_event_id is null
+  and google_contact_id is null
+  and resend_email_id is null
+);
+
+create or replace function public.public_slot_counts(start_date date, end_date date)
+returns table (
+  appointment_date date,
+  appointment_time time,
+  active_count bigint
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    appointments.appointment_date,
+    appointments.appointment_time,
+    count(*) as active_count
+  from public.appointments
+  where appointments.appointment_date between start_date and end_date
+    and appointments.status in ('pending', 'confirmed')
+  group by appointments.appointment_date, appointments.appointment_time;
+$$;
+
+grant execute on function public.public_slot_counts(date, date) to anon, authenticated;
+grant insert on public.appointments to anon, authenticated;
