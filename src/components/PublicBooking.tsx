@@ -40,6 +40,7 @@ async function callPublicRpc<T>(functionName: string, payload: Record<string, un
     method: "POST",
     headers: {
       apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
       "Content-Type": "application/json",
       Accept: "application/json"
     },
