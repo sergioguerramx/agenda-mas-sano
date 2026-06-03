@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
+import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent } from "@/services/google-calendar";
 import { sendInternalAppointmentEmail } from "@/services/resend";
 import type { AppointmentRow } from "@/types/appointments";
@@ -84,6 +85,15 @@ export async function POST(request: Request) {
     }
 
     const automationStatus: Record<string, string> = {};
+
+    try {
+      if (!adminSupabase) throw new Error("No se pudo conectar contactos.");
+      const contactResult = await syncContactFromAppointment(adminSupabase, row.id);
+      automationStatus.contact = contactResult.status;
+    } catch (contactError) {
+      automationStatus.contact = "failed";
+      logAutomationWarning("Contact sync warning", contactError);
+    }
 
     try {
       const calendarResult = await createGoogleCalendarEvent(row);

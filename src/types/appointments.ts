@@ -27,3 +27,33 @@ export type AppointmentRow = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type ContactRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  whatsapp: string;
+  source: string;
+  branch: string;
+  first_appointment_date: string;
+  last_appointment_date: string;
+  total_appointments: number;
+  latest_status: AppointmentStatus;
+  latest_appointment_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Contact = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  whatsapp: string;
+  source: string;
+  branch: string;
+  firstAppointmentDate: string;
+  lastAppointmentDate: string;
+  totalAppointments: number;
+  latestStatus: AppointmentStatus;
+  latestAppointmentId?: string | null;
+};
