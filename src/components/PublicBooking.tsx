@@ -8,6 +8,7 @@ import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
+type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
 
 const emptyDraft: AppointmentDraft = {
   firstName: "",
@@ -16,6 +17,16 @@ const emptyDraft: AppointmentDraft = {
   date: "",
   time: ""
 };
+
+function logSupabaseError(context: string, supabaseError: unknown) {
+  const safeError = supabaseError as SupabaseSafeError;
+  console.error(context, {
+    message: safeError.message,
+    code: safeError.code,
+    details: safeError.details,
+    hint: safeError.hint
+  });
+}
 
 export function PublicBooking() {
   const [step, setStep] = useState<Step>("date");
@@ -59,8 +70,9 @@ export function PublicBooking() {
           nextSlots[row.appointment_time.slice(0, 5)] = Number(row.active_count);
         });
         setReservedSlots(nextSlots);
-      } catch {
+      } catch (supabaseError) {
         if (!ignore) {
+          logSupabaseError("Supabase public_slot_counts error", supabaseError);
           setReservedSlots({});
           setError("No se pudieron cargar los horarios disponibles. Intenta de nuevo.");
         }
@@ -105,20 +117,21 @@ export function PublicBooking() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error: supabaseError } = await supabase.from("appointments").insert({
-        first_name: draft.firstName.trim(),
-        last_name: draft.lastName.trim(),
-        whatsapp,
-        appointment_date: draft.date,
-        appointment_time: draft.time,
-        status: "pending"
+      const { error: supabaseError } = await supabase.rpc("request_public_appointment", {
+        p_first_name: draft.firstName.trim(),
+        p_last_name: draft.lastName.trim(),
+        p_whatsapp: whatsapp,
+        p_appointment_date: draft.date,
+        p_appointment_time: draft.time
       });
 
       if (supabaseError) throw supabaseError;
 
       setStep("done");
-    } catch {
-      setError("No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
+    } catch (supabaseError) {
+      logSupabaseError("Supabase request_public_appointment error", supabaseError);
+      const message = (supabaseError as SupabaseSafeError).message;
+      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
     } finally {
       setSaving(false);
     }

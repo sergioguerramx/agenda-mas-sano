@@ -61,15 +61,6 @@ create policy "Admins can manage appointments" on public.appointments
 for all using (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'))
 with check (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'));
 
-create policy "Public can request pending appointments" on public.appointments
-for insert
-with check (
-  status = 'pending'
-  and google_calendar_event_id is null
-  and google_contact_id is null
-  and resend_email_id is null
-);
-
 create or replace function public.public_slot_counts(start_date date, end_date date)
 returns table (
   appointment_date date,
@@ -91,4 +82,68 @@ as $$
 $$;
 
 grant execute on function public.public_slot_counts(date, date) to anon, authenticated;
-grant insert on public.appointments to anon, authenticated;
+
+drop policy if exists "Public can request pending appointments" on public.appointments;
+revoke insert on public.appointments from anon, authenticated;
+
+create or replace function public.request_public_appointment(
+  p_first_name text,
+  p_last_name text,
+  p_whatsapp text,
+  p_appointment_date date,
+  p_appointment_time time
+)
+returns table (
+  success boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  active_count integer;
+begin
+  if nullif(trim(p_first_name), '') is null then
+    raise exception using message = 'Agrega nombre para continuar.';
+  end if;
+
+  if nullif(trim(p_last_name), '') is null then
+    raise exception using message = 'Agrega apellidos para continuar.';
+  end if;
+
+  if nullif(trim(p_whatsapp), '') is null then
+    raise exception using message = 'Agrega WhatsApp para continuar.';
+  end if;
+
+  select count(*) into active_count
+  from public.appointments
+  where appointment_date = p_appointment_date
+    and appointment_time = p_appointment_time
+    and status in ('pending', 'confirmed');
+
+  if active_count >= 2 then
+    raise exception using message = 'Este horario ya no tiene lugares disponibles.';
+  end if;
+
+  insert into public.appointments (
+    first_name,
+    last_name,
+    whatsapp,
+    appointment_date,
+    appointment_time,
+    status
+  )
+  values (
+    trim(p_first_name),
+    trim(p_last_name),
+    trim(p_whatsapp),
+    p_appointment_date,
+    p_appointment_time,
+    'pending'
+  );
+
+  return query select true;
+end;
+$$;
+
+grant execute on function public.request_public_appointment(text, text, text, date, time) to anon, authenticated;
