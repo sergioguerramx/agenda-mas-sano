@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient, isSupabaseConfigured } from "@/lib/supabase";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
+import { createGoogleCalendarEvent } from "@/services/google-calendar";
+import { sendInternalAppointmentEmail } from "@/services/resend";
+import type { AppointmentRow } from "@/types/appointments";
 
 type RequestPayload = {
   firstName?: string;
@@ -10,6 +13,18 @@ type RequestPayload = {
 };
 
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
+
+function logAutomationError(context: string, error: unknown) {
+  console.error(context, {
+    message: error instanceof Error ? error.message : "Error desconocido"
+  });
+}
+
+function logAutomationWarning(context: string, error: unknown) {
+  console.warn(context, {
+    message: error instanceof Error ? error.message : "Aviso sin detalle"
+  });
+}
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
@@ -36,7 +51,71 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    let adminSupabase: ReturnType<typeof createSupabaseServiceRoleClient> | null = null;
+    let row: AppointmentRow = {
+      id: "",
+      first_name: payload.firstName ?? "",
+      last_name: payload.lastName ?? "",
+      whatsapp: payload.whatsapp ?? "",
+      appointment_date: payload.date ?? "",
+      appointment_time: payload.time ?? "",
+      status: "pending"
+    };
+
+    try {
+      adminSupabase = createSupabaseServiceRoleClient();
+      const { data: appointment, error: appointmentError } = await adminSupabase
+        .from("appointments")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, created_at, updated_at")
+        .eq("appointment_date", payload.date)
+        .eq("appointment_time", payload.time)
+        .eq("whatsapp", payload.whatsapp)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (appointmentError || !appointment) {
+        throw appointmentError ?? new Error("No se encontro la cita recien creada.");
+      }
+
+      row = appointment as AppointmentRow;
+    } catch (automationError) {
+      logAutomationError("Appointment automation setup error", automationError);
+    }
+
+    const automationStatus: Record<string, string> = {};
+
+    try {
+      const calendarResult = await createGoogleCalendarEvent(row);
+      automationStatus.calendar = calendarResult.status;
+
+      if (calendarResult.eventId && adminSupabase && row.id) {
+        await adminSupabase
+          .from("appointments")
+          .update({ google_calendar_event_id: calendarResult.eventId })
+          .eq("id", row.id);
+      }
+    } catch (calendarError) {
+      automationStatus.calendar = "failed";
+      logAutomationError("Google Calendar appointment automation error", calendarError);
+    }
+
+    try {
+      const emailResult = await sendInternalAppointmentEmail(row);
+      automationStatus.email = emailResult.status;
+
+      if (emailResult.emailId && adminSupabase && row.id) {
+        await adminSupabase
+          .from("appointments")
+          .update({ resend_email_id: emailResult.emailId })
+          .eq("id", row.id);
+      }
+    } catch (emailError) {
+      automationStatus.email = "failed";
+      logAutomationWarning("Internal appointment email automation warning", emailError);
+    }
+
+    return NextResponse.json({ success: true, automationStatus });
   } catch (error) {
     const safeError = error as SupabaseSafeError;
     console.error("Supabase request_public_appointment server error", {

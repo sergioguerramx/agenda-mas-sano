@@ -146,16 +146,24 @@ export function PanelDashboard() {
   }
 
   async function updateStatus(id: string, next: AppointmentStatus) {
-    if (!supabase) return;
+    if (!supabase || !session) return;
 
     const previous = items;
     setItems((all) => all.map((item) => (item.id === id ? { ...item, status: next } : item)));
 
-    const { error } = await supabase.from("appointments").update({ status: next }).eq("id", id);
+    const response = await fetch("/api/appointments/status", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id, status: next })
+    });
 
-    if (error) {
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
       setItems(previous);
-      setMessage("No se pudo cambiar el estado.");
+      setMessage(body.error ?? "No se pudo cambiar el estado.");
     }
   }
 

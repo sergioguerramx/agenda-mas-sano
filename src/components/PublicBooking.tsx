@@ -149,23 +149,29 @@ export function PublicBooking() {
     setError("");
 
     try {
-      await callPublicRpc<void>("request_public_appointment", {
-        p_first_name: draft.firstName.trim(),
-        p_last_name: draft.lastName.trim(),
-        p_whatsapp: whatsapp,
-        p_appointment_date: draft.date,
-        p_appointment_time: draft.time
+      const response = await fetch("/api/appointments/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: draft.firstName.trim(),
+          lastName: draft.lastName.trim(),
+          whatsapp,
+          date: draft.date,
+          time: draft.time
+        })
       });
 
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "No se pudo guardar la cita.");
+      }
+
       setStep("done");
-    } catch (supabaseError) {
-      const config = getSupabaseConfig();
-      logSupabaseError("Supabase request_public_appointment error", supabaseError);
-      console.error("Supabase base URL used", { url: config.url });
-      const message = supabaseError instanceof Error
-        ? supabaseError.message
-        : (supabaseError as SupabaseSafeError).message;
-      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo conectar con Supabase para guardar la cita.");
+    } catch (bookingError) {
+      const message = bookingError instanceof Error
+        ? bookingError.message
+        : (bookingError as SupabaseSafeError).message;
+      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Intenta de nuevo.");
     } finally {
       setSaving(false);
     }
