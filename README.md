@@ -11,7 +11,7 @@ El proyecto ya conecta la agenda publica y el panel interno con Supabase real.
 - Captura de nombre, apellidos y WhatsApp.
 - Guardado real de citas en estado pendiente.
 - Creacion de evento en Google Calendar desde que la cita queda pendiente.
-- Correo interno a Mas Sano cuando entra una nueva cita.
+- Correo interno a Mas Sano cuando entra una nueva cita, si Resend esta configurado.
 - Panel interno en `/panel`.
 - Login con Supabase Auth y Google.
 - Lista real de citas con filtros, cambio de estado y copiado de WhatsApp.
@@ -112,11 +112,13 @@ Google Contacts queda pendiente para una fase posterior. Para conectarlo se debe
 
 ## Resend
 
-Resend se usa solo para aviso interno, no para mandar correo al cliente.
+Correo interno por Resend pendiente hasta verificar dominio massanonh.com.
 
-Para activarlo:
+Resend es opcional. Si faltan `RESEND_API_KEY` o `RESEND_FROM_EMAIL`, la cita se guarda y Google Calendar sigue funcionando. Si Resend falla, solo se registra el aviso interno en logs y no se muestra error al paciente.
 
-1. Crear cuenta y dominio en Resend.
+Para activarlo despues:
+
+1. Verificar el dominio `massanonh.com` en Resend.
 2. Guardar en Vercel:
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
