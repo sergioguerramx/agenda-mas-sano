@@ -1,3 +1,5 @@
+import { createClient } from "@supabase/supabase-js";
+
 export function getSupabaseConfig() {
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
@@ -8,4 +10,35 @@ export function getSupabaseConfig() {
 export function isSupabaseConfigured() {
   const config = getSupabaseConfig();
   return Boolean(config.url && config.anonKey);
+}
+
+export function createSupabaseBrowserClient() {
+  const config = getSupabaseConfig();
+
+  if (!config.url || !config.anonKey) {
+    throw new Error("Falta conectar Supabase.");
+  }
+
+  return createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+}
+
+export function createSupabaseServerClient() {
+  const config = getSupabaseConfig();
+
+  if (!config.url || !config.anonKey) {
+    throw new Error("Falta conectar Supabase.");
+  }
+
+  return createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
 }
