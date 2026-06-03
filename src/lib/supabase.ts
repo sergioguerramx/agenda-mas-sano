@@ -71,3 +71,24 @@ export function createSupabaseServerClient() {
     }
   });
 }
+
+export function createSupabaseServiceRoleClient() {
+  const config = getSupabaseConfig();
+  const configError = getSupabaseConfigError();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+
+  if (configError) {
+    throw new Error(configError);
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error("Falta configurar SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  return createClient(config.url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}

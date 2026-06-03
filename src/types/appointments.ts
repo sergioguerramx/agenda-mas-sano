@@ -21,6 +21,9 @@ export type AppointmentRow = {
   appointment_date: string;
   appointment_time: string;
   status: AppointmentStatus;
+  google_calendar_event_id?: string | null;
+  google_contact_id?: string | null;
+  resend_email_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };

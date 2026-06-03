@@ -4,20 +4,17 @@ Aplicacion web para agenda de citas de Mas Sano Nutricion Holistica.
 
 ## Estado de esta fase
 
-Esta fase deja la base inicial lista para revision:
+El proyecto ya conecta la agenda publica y el panel interno con Supabase real.
 
 - Agenda publica mobile-first.
 - Seleccion de fecha y horario.
 - Captura de nombre, apellidos y WhatsApp.
-- Confirmacion visual y boton de WhatsApp.
+- Guardado real de citas en estado pendiente.
+- Creacion de evento en Google Calendar desde que la cita queda pendiente.
+- Correo interno a Mas Sano cuando entra una nueva cita.
 - Panel interno en `/panel`.
-- Login preparado para Supabase Auth con Google.
-- Lista mock de citas con filtros y cambio de estado.
-- Esquema SQL inicial para Supabase.
-- Placeholders para Google Calendar, Google Contacts y Resend.
-- Configuracion preparada para conectar Supabase en la siguiente fase.
-
-Todavia no conecta servicios reales ni usa claves privadas.
+- Login con Supabase Auth y Google.
+- Lista real de citas con filtros, cambio de estado y copiado de WhatsApp.
 
 ## Correr localmente
 
@@ -32,7 +29,7 @@ Abrir `http://localhost:3000` para la agenda publica y `http://localhost:3000/pa
 
 ## Variables pendientes
 
-Crear un archivo `.env.local` a partir de `.env.example` cuando se vaya a conectar la siguiente fase.
+Crear un archivo `.env.local` a partir de `.env.example` para desarrollo local. En Vercel, configurar las mismas variables desde Environment Variables.
 
 Variables preparadas:
 
@@ -40,12 +37,15 @@ Variables preparadas:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_CALENDAR_ID`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_PRIVATE_KEY`
+- `GOOGLE_CALENDAR_TIME_ZONE`
+- `GOOGLE_CALENDAR_EVENT_DURATION_MINUTES`
 - `GOOGLE_CONTACTS_GROUP_ID`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
+- `INTERNAL_NOTIFY_EMAIL`
 - `NEXT_PUBLIC_WHATSAPP_PHONE`
 
 No se deben subir secretos reales al repositorio.
@@ -76,28 +76,33 @@ Tambien agrega los correos permitidos para el panel:
 - `info.mas.sano@gmail.com`
 - `ms.suc.puentes@gmail.com`
 
-Para conectar Supabase en la siguiente fase:
+Para conectar Supabase:
 
 1. Crear el proyecto en Supabase.
 2. Ejecutar `supabase/schema.sql`.
 3. Activar Google como proveedor de autenticacion.
 4. Completar las variables de Supabase en `.env.local`.
-5. Reemplazar los datos mock por consultas reales a Supabase.
-6. Mantener Supabase como fuente principal de verdad para citas y administradores.
+5. Mantener Supabase como fuente principal de verdad para citas y administradores.
 
 ## Google Calendar
 
-El archivo `src/services/google-calendar.ts` contiene un placeholder. En la siguiente fase se debe:
+Google Calendar se usa para bloquear el espacio desde que la cita queda en estado pendiente.
 
-1. Crear credenciales OAuth en Google Cloud.
-2. Guardar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_CALENDAR_ID`.
-3. Crear eventos al confirmar una cita.
-4. Guardar el id del evento en `appointments.google_calendar_event_id`.
-5. Manejar cambios o cancelaciones actualizando el evento existente.
+Para activarlo:
+
+1. Crear una cuenta de servicio en Google Cloud.
+2. Compartir el calendario destino con el correo de esa cuenta de servicio.
+3. Guardar en Vercel:
+   - `GOOGLE_CALENDAR_ID`
+   - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+   - `GOOGLE_PRIVATE_KEY`
+   - `GOOGLE_CALENDAR_TIME_ZONE`
+4. Al crear una cita, se crea un evento pendiente y se guarda su ID en `appointments.google_calendar_event_id`.
+5. Al cambiar estado desde el panel, el evento se actualiza. Si la cita se cancela, el evento se elimina.
 
 ## Google Contacts
 
-El archivo `src/services/google-contacts.ts` contiene un placeholder. En la siguiente fase se debe:
+Google Contacts queda pendiente para una fase posterior. Para conectarlo se debe:
 
 1. Activar People API en Google Cloud.
 2. Guardar el grupo de contactos en `GOOGLE_CONTACTS_GROUP_ID`.
@@ -107,13 +112,17 @@ El archivo `src/services/google-contacts.ts` contiene un placeholder. En la sigu
 
 ## Resend
 
-El archivo `src/services/resend.ts` contiene un placeholder. En la siguiente fase se debe:
+Resend se usa solo para aviso interno, no para mandar correo al cliente.
+
+Para activarlo:
 
 1. Crear cuenta y dominio en Resend.
-2. Guardar `RESEND_API_KEY` y `RESEND_FROM_EMAIL`.
-3. Enviar confirmaciones de cita.
-4. Guardar el id del envio en `appointments.resend_email_id`.
-5. Agregar plantillas de correo para confirmacion, cambio y cancelacion.
+2. Guardar en Vercel:
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
+   - `INTERNAL_NOTIFY_EMAIL`
+3. Cuando entra una cita nueva, se manda un correo interno a `info.mas.sano@gmail.com` o al correo configurado.
+4. El ID del envio se guarda en `appointments.resend_email_id`.
 
 ## Vercel
 
