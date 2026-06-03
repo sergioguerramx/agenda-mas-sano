@@ -119,6 +119,8 @@ export function PublicBooking() {
     try {
       const response = await fetch("/api/appointments/request", {
         method: "POST",
+        credentials: "include",
+        redirect: "manual",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           firstName: draft.firstName.trim(),
@@ -128,6 +130,10 @@ export function PublicBooking() {
           time: draft.time
         })
       });
+
+      if (response.type === "opaqueredirect" || response.status === 401 || response.status === 403) {
+        throw new Error("El preview de Vercel esta protegido. Abre un preview con acceso publico o desactiva la proteccion para probar citas reales.");
+      }
 
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as AppointmentRequestError;
@@ -139,7 +145,10 @@ export function PublicBooking() {
       console.error("Appointment request error", {
         message: requestError instanceof Error ? requestError.message : String(requestError)
       });
-      const message = requestError instanceof Error ? requestError.message : "";
+      const rawMessage = requestError instanceof Error ? requestError.message : "";
+      const message = rawMessage.includes("fetch failed")
+        ? "El preview de Vercel esta protegido. Abre un preview con acceso publico o desactiva la proteccion para probar citas reales."
+        : rawMessage;
       setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
     } finally {
       setSaving(false);
