@@ -27,18 +27,3 @@ export function createSupabaseBrowserClient() {
     }
   });
 }
-
-export function createSupabaseServerClient() {
-  const config = getSupabaseConfig();
-
-  if (!config.url || !config.anonKey) {
-    throw new Error("Falta conectar Supabase.");
-  }
-
-  return createClient(config.url, config.anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
-  });
-}
