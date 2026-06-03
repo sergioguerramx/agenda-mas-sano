@@ -54,12 +54,16 @@ on conflict (email) do nothing;
 alter table public.admin_users enable row level security;
 alter table public.appointments enable row level security;
 
+drop policy if exists "Admins can read admin users" on public.admin_users;
 create policy "Admins can read admin users" on public.admin_users
 for select using (email = auth.jwt() ->> 'email');
 
+drop policy if exists "Admins can manage appointments" on public.appointments;
 create policy "Admins can manage appointments" on public.appointments
 for all using (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'))
 with check (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'));
+
+grant usage on schema public to anon, authenticated;
 
 create or replace function public.public_slot_counts(start_date date, end_date date)
 returns table (

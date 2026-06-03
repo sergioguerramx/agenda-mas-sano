@@ -74,7 +74,7 @@ export function PublicBooking() {
         if (!ignore) {
           logSupabaseError("Supabase public_slot_counts error", supabaseError);
           setReservedSlots({});
-          setError("No se pudieron cargar los horarios disponibles. Intenta de nuevo.");
+          setError("No se pudieron confirmar los lugares disponibles. Puedes elegir horario; al confirmar validaremos disponibilidad.");
         }
       } finally {
         if (!ignore) setLoadingSlots(false);
@@ -211,7 +211,7 @@ export function PublicBooking() {
                     {slots.map((slot) => (
                       <button
                         className={`choice ${draft.time === slot.time ? "selected" : ""}`}
-                        disabled={!slot.available || loadingSlots || Boolean(error)}
+                        disabled={!slot.available || loadingSlots}
                         key={slot.time}
                         onClick={() => {
                           setDraft({ ...draft, time: slot.time });
