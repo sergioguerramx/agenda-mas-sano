@@ -20,6 +20,12 @@ function logAutomationError(context: string, error: unknown) {
   });
 }
 
+function logAutomationWarning(context: string, error: unknown) {
+  console.warn(context, {
+    message: error instanceof Error ? error.message : "Aviso sin detalle"
+  });
+}
+
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Falta conectar Supabase." }, { status: 500 });
@@ -106,7 +112,7 @@ export async function POST(request: Request) {
       }
     } catch (emailError) {
       automationStatus.email = "failed";
-      logAutomationError("Internal appointment email automation error", emailError);
+      logAutomationWarning("Internal appointment email automation warning", emailError);
     }
 
     return NextResponse.json({ success: true, automationStatus });
