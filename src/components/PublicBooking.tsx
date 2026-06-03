@@ -9,6 +9,7 @@ import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
+type AppointmentRequestError = { error?: string };
 
 const emptyDraft: AppointmentDraft = {
   firstName: "",
@@ -26,6 +27,29 @@ function logSupabaseError(context: string, supabaseError: unknown) {
     details: safeError.details,
     hint: safeError.hint
   });
+}
+
+function isNetworkError(error: unknown) {
+  return error instanceof TypeError || String(error).toLowerCase().includes("failed to fetch");
+}
+
+async function requestAppointmentFallback(draft: AppointmentDraft, whatsapp: string) {
+  const response = await fetch("/api/appointments/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      firstName: draft.firstName.trim(),
+      lastName: draft.lastName.trim(),
+      whatsapp,
+      date: draft.date,
+      time: draft.time
+    })
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as AppointmentRequestError;
+    throw new Error(body.error ?? "No se pudo guardar la cita.");
+  }
 }
 
 export function PublicBooking() {
@@ -130,8 +154,19 @@ export function PublicBooking() {
       setStep("done");
     } catch (supabaseError) {
       logSupabaseError("Supabase request_public_appointment error", supabaseError);
-      const message = (supabaseError as SupabaseSafeError).message;
-      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
+      try {
+        if (!isNetworkError(supabaseError)) throw supabaseError;
+        await requestAppointmentFallback(draft, whatsapp);
+        setStep("done");
+      } catch (fallbackError) {
+        console.error("Appointment fallback request error", {
+          message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+        });
+        const message = fallbackError instanceof Error
+          ? fallbackError.message
+          : (supabaseError as SupabaseSafeError).message;
+        setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo conectar con Supabase para guardar la cita.");
+      }
     } finally {
       setSaving(false);
     }
