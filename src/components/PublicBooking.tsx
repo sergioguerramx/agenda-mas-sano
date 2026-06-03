@@ -3,7 +3,7 @@
 import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
-import { getSupabaseConfig, isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabaseConfig, getSupabaseConfigError, isSupabaseConfigured } from "@/lib/supabase";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
@@ -31,9 +31,10 @@ function logSupabaseError(context: string, supabaseError: unknown) {
 
 async function callPublicRpc<T>(functionName: string, payload: Record<string, unknown>) {
   const config = getSupabaseConfig();
+  const configError = getSupabaseConfigError();
 
-  if (!config.url || !config.anonKey) {
-    throw new Error("Falta conectar Supabase.");
+  if (configError) {
+    throw new Error(configError);
   }
 
   const response = await fetch(`${config.url.replace(/\/+$/, "")}/rest/v1/rpc/${functionName}`, {
@@ -102,7 +103,9 @@ export function PublicBooking() {
         setReservedSlots(nextSlots);
       } catch (supabaseError) {
         if (!ignore) {
+          const config = getSupabaseConfig();
           logSupabaseError("Supabase public_slot_counts error", supabaseError);
+          console.error("Supabase base URL used", { url: config.url });
           setReservedSlots({});
           setError("No se pudieron confirmar los lugares disponibles. Puedes elegir horario; al confirmar validaremos disponibilidad.");
         }
@@ -156,7 +159,9 @@ export function PublicBooking() {
 
       setStep("done");
     } catch (supabaseError) {
+      const config = getSupabaseConfig();
       logSupabaseError("Supabase request_public_appointment error", supabaseError);
+      console.error("Supabase base URL used", { url: config.url });
       const message = supabaseError instanceof Error
         ? supabaseError.message
         : (supabaseError as SupabaseSafeError).message;
