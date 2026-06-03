@@ -9,7 +9,6 @@ import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
-type AppointmentRequestError = { error?: string };
 
 const emptyDraft: AppointmentDraft = {
   firstName: "",
@@ -117,39 +116,24 @@ export function PublicBooking() {
     setError("");
 
     try {
-      const response = await fetch("/api/appointments/request", {
-        method: "POST",
-        credentials: "include",
-        redirect: "manual",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: draft.firstName.trim(),
-          lastName: draft.lastName.trim(),
-          whatsapp,
-          date: draft.date,
-          time: draft.time
-        })
+      const supabase = createSupabaseBrowserClient();
+      const { error: supabaseError } = await supabase.rpc("request_public_appointment", {
+        p_first_name: draft.firstName.trim(),
+        p_last_name: draft.lastName.trim(),
+        p_whatsapp: whatsapp,
+        p_appointment_date: draft.date,
+        p_appointment_time: draft.time
       });
 
-      if (response.type === "opaqueredirect" || response.status === 401 || response.status === 403) {
-        throw new Error("El preview de Vercel esta protegido. Abre un preview con acceso publico o desactiva la proteccion para probar citas reales.");
-      }
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as AppointmentRequestError;
-        throw new Error(body.error ?? "No se pudo guardar la cita.");
-      }
+      if (supabaseError) throw supabaseError;
 
       setStep("done");
-    } catch (requestError) {
-      console.error("Appointment request error", {
-        message: requestError instanceof Error ? requestError.message : String(requestError)
-      });
-      const rawMessage = requestError instanceof Error ? requestError.message : "";
-      const message = rawMessage.includes("fetch failed")
-        ? "El preview de Vercel esta protegido. Abre un preview con acceso publico o desactiva la proteccion para probar citas reales."
-        : rawMessage;
-      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Revisa el horario o intenta de nuevo.");
+    } catch (supabaseError) {
+      logSupabaseError("Supabase request_public_appointment error", supabaseError);
+      const message = supabaseError instanceof Error
+        ? supabaseError.message
+        : (supabaseError as SupabaseSafeError).message;
+      setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo conectar con Supabase para guardar la cita.");
     } finally {
       setSaving(false);
     }
