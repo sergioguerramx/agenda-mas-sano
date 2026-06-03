@@ -14,6 +14,20 @@ const labels: Record<AppointmentStatus, string> = {
   completed: "completada"
 };
 
+const PRODUCTION_SITE_URL = "https://agenda-mas-sano.vercel.app";
+
+function getPanelRedirectUrl() {
+  const browserOrigin = window.location.origin.replace(/\/+$/, "");
+  const envSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
+  const safeSiteUrl = browserOrigin.includes("localhost")
+    ? envSiteUrl && !envSiteUrl.includes("localhost")
+      ? envSiteUrl
+      : PRODUCTION_SITE_URL
+    : browserOrigin;
+
+  return `${safeSiteUrl}/panel`;
+}
+
 function toAppointment(row: AppointmentRow): Appointment {
   return {
     id: row.id,
@@ -117,10 +131,9 @@ export function PanelDashboard() {
   async function login() {
     if (!supabase) return;
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${siteUrl}/panel` }
+      options: { redirectTo: getPanelRedirectUrl() }
     });
   }
 
