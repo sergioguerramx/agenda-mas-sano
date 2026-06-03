@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const FALLBACK_SUPABASE_URL = "https://wsztokoowfwbeppeutnj.supabase.co";
+const FALLBACK_SUPABASE_URL = "https://wsztokoowfwbebpeutnj.supabase.co";
 
 export function normalizeSupabaseUrl(value: string) {
   const trimmedValue = value.trim();
