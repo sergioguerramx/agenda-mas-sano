@@ -15,10 +15,29 @@ type GoogleCalendarEventResponse = {
   };
 };
 
+type GoogleCalendarEvent = {
+  id?: string;
+  status?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
+};
+
+type GoogleCalendarEventsResponse = {
+  items?: GoogleCalendarEvent[];
+  error?: {
+    message?: string;
+  };
+};
+
 type CalendarResult = {
   status: "created" | "updated" | "deleted" | "skipped";
   eventId?: string;
   reason?: string;
+};
+
+export type CalendarSlotCount = {
+  time: string;
+  count: number;
 };
 
 let tokenCache: { accessToken: string; expiresAt: number } | null = null;
@@ -27,6 +46,7 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const DEFAULT_TIME_ZONE = "America/Monterrey";
 const DEFAULT_DURATION_MINUTES = 20;
+const MAX_EVENTS_PER_SLOT = 2;
 
 function getCalendarConfig() {
   return {
@@ -99,12 +119,18 @@ async function getGoogleAccessToken() {
   return body.access_token;
 }
 
-function addMinutes(date: string, time: string, minutes: number) {
+function toMinutes(time: string) {
   const [hour = 0, minute = 0] = time.slice(0, 5).split(":").map(Number);
-  const total = hour * 60 + minute + minutes;
-  const nextHour = Math.floor(total / 60);
-  const nextMinute = total % 60;
-  return `${date}T${String(nextHour).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}:00`;
+  return hour * 60 + minute;
+}
+
+function fromMinutes(total: number) {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function addMinutes(date: string, time: string, minutes: number) {
+  const total = toMinutes(time) + minutes;
+  return `${date}T${fromMinutes(total)}:00`;
 }
 
 function getStatusLabel(status: AppointmentStatus) {
@@ -158,13 +184,61 @@ async function callGoogleCalendar(path: string, init: RequestInit) {
     }
   });
 
-  const body = (await response.json().catch(() => ({}))) as GoogleCalendarEventResponse;
+  const body = (await response.json().catch(() => ({}))) as GoogleCalendarEventResponse | GoogleCalendarEventsResponse;
 
   if (!response.ok) {
     throw new Error(body.error?.message ?? "No se pudo actualizar Google Calendar.");
   }
 
   return body;
+}
+
+function getEventStart(event: GoogleCalendarEvent, date: string) {
+  if (event.start?.dateTime) return new Date(event.start.dateTime).getTime();
+  if (event.start?.date) return new Date(`${event.start.date}T00:00:00`).getTime();
+  return new Date(`${date}T00:00:00`).getTime();
+}
+
+function getEventEnd(event: GoogleCalendarEvent, date: string) {
+  if (event.end?.dateTime) return new Date(event.end.dateTime).getTime();
+  if (event.end?.date) return new Date(`${event.end.date}T00:00:00`).getTime();
+  return new Date(`${date}T23:59:59`).getTime();
+}
+
+async function listGoogleCalendarEvents(date: string) {
+  if (!isGoogleCalendarConfigured()) {
+    throw new Error("Google Calendar no esta configurado.");
+  }
+
+  const config = getCalendarConfig();
+  const params = new URLSearchParams({
+    timeMin: `${date}T00:00:00`,
+    timeMax: `${date}T23:59:59`,
+    timeZone: config.timeZone,
+    singleEvents: "true",
+    showDeleted: "false",
+    orderBy: "startTime"
+  });
+
+  const body = await callGoogleCalendar(`/events?${params.toString()}`, { method: "GET" }) as GoogleCalendarEventsResponse;
+  return (body.items ?? []).filter((event) => event.status !== "cancelled");
+}
+
+export async function getGoogleCalendarSlotCounts(date: string, slotTimes: string[]): Promise<CalendarSlotCount[]> {
+  const config = getCalendarConfig();
+  const events = await listGoogleCalendarEvents(date);
+
+  return slotTimes.map((time) => {
+    const slotStart = new Date(`${date}T${time}:00`).getTime();
+    const slotEnd = new Date(addMinutes(date, time, config.durationMinutes)).getTime();
+    const count = events.filter((event) => getEventStart(event, date) < slotEnd && getEventEnd(event, date) > slotStart).length;
+    return { time, count };
+  });
+}
+
+export async function isGoogleCalendarSlotAvailable(date: string, time: string) {
+  const [slot] = await getGoogleCalendarSlotCounts(date, [time.slice(0, 5)]);
+  return (slot?.count ?? 0) < MAX_EVENTS_PER_SLOT;
 }
 
 export async function createGoogleCalendarEvent(appointment: AppointmentRow): Promise<CalendarResult> {
@@ -175,7 +249,7 @@ export async function createGoogleCalendarEvent(appointment: AppointmentRow): Pr
   const body = await callGoogleCalendar("/events", {
     method: "POST",
     body: JSON.stringify(getEventBody(appointment, "pending"))
-  });
+  }) as GoogleCalendarEventResponse;
 
   return { status: "created", eventId: body.id };
 }
@@ -199,7 +273,7 @@ export async function syncGoogleCalendarEventStatus(appointment: AppointmentRow,
   const body = await callGoogleCalendar(`/events/${encodeURIComponent(appointment.google_calendar_event_id)}`, {
     method: "PATCH",
     body: JSON.stringify(getEventBody(appointment, status))
-  });
+  }) as GoogleCalendarEventResponse;
 
   return { status: "updated", eventId: body.id ?? appointment.google_calendar_event_id };
 }
