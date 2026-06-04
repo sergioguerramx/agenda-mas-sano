@@ -13,7 +13,7 @@ const schedule: Record<number, Array<{ start: string; end: string }>> = {
   2: [{ start: "09:20", end: "13:20" }, { start: "15:00", end: "19:00" }],
   4: [{ start: "09:20", end: "13:20" }, { start: "15:00", end: "19:00" }],
   5: [{ start: "09:20", end: "13:20" }, { start: "15:00", end: "19:00" }],
-  6: [{ start: "10:00", end: "15:20" }]
+  6: [{ start: "10:00", end: "15:00" }]
 };
 export function buildAvailableDates(now: Date): AvailableDate[] {
   return Array.from({ length: MAX_DAYS_AHEAD + 1 }, (_, index) => {

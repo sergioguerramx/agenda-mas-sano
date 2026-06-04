@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
+import { buildSlotsForDate } from "@/lib/schedule";
 import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent, isGoogleCalendarSlotAvailable } from "@/services/google-calendar";
 import { isGoogleContactsConfigured, upsertGoogleContact } from "@/services/google-contacts";
@@ -113,6 +114,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Elige fecha y horario para continuar." }, { status: 400 });
     }
 
+    const normalizedTime = payload.time.slice(0, 5);
+    const requestedSlot = buildSlotsForDate(payload.date, new Date()).find((slot) => slot.time === normalizedTime);
+
+    if (!requestedSlot || !requestedSlot.available) {
+      console.warn("Appointment rejected by public schedule validation", {
+        payload: {
+          date: payload.date,
+          time: payload.time,
+          whatsapp: payload.whatsapp
+        }
+      });
+
+      return NextResponse.json(
+        { error: "Ese horario no está disponible. Elige otro horario." },
+        { status: 409 }
+      );
+    }
+
     const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(payload.date, payload.time);
 
     if (!calendarSlotAvailable) {
@@ -141,7 +160,7 @@ export async function POST(request: Request) {
       p_last_name: payload.lastName,
       p_whatsapp: payload.whatsapp,
       p_appointment_date: payload.date,
-      p_appointment_time: payload.time
+      p_appointment_time: normalizedTime
     });
 
     if (error) throw error;
@@ -155,7 +174,7 @@ export async function POST(request: Request) {
       last_name: payload.lastName ?? "",
       whatsapp: payload.whatsapp ?? "",
       appointment_date: payload.date ?? "",
-      appointment_time: payload.time ?? "",
+      appointment_time: normalizedTime,
       status: "pending"
     };
 
@@ -163,7 +182,7 @@ export async function POST(request: Request) {
       createdAppointmentId,
       payload: {
         date: payload.date,
-        time: payload.time,
+        time: normalizedTime,
         whatsapp: payload.whatsapp
       },
       adminSupabaseAvailable: false
@@ -181,7 +200,7 @@ export async function POST(request: Request) {
           createdAppointmentId,
           payload: {
             date: payload.date,
-            time: payload.time,
+            time: normalizedTime,
             whatsapp: payload.whatsapp
           },
           adminSupabaseAvailable: false
@@ -198,7 +217,7 @@ export async function POST(request: Request) {
       } else {
         appointmentQuery = appointmentQuery
           .eq("appointment_date", payload.date)
-          .eq("appointment_time", payload.time)
+          .eq("appointment_time", normalizedTime)
           .eq("whatsapp", payload.whatsapp)
           .order("created_at", { ascending: false })
           .limit(1);
@@ -208,7 +227,7 @@ export async function POST(request: Request) {
         createdAppointmentId,
         payload: {
           date: payload.date,
-          time: payload.time,
+          time: normalizedTime,
           whatsapp: payload.whatsapp
         },
         adminSupabaseAvailable: Boolean(adminSupabase)
@@ -221,7 +240,7 @@ export async function POST(request: Request) {
           createdAppointmentId,
           payload: {
             date: payload.date,
-            time: payload.time,
+            time: normalizedTime,
             whatsapp: payload.whatsapp
           },
           adminSupabaseAvailable: Boolean(adminSupabase)
@@ -235,7 +254,7 @@ export async function POST(request: Request) {
           createdAppointmentId,
           payload: {
             date: payload.date,
-            time: payload.time,
+            time: normalizedTime,
             whatsapp: payload.whatsapp
           },
           adminSupabaseAvailable: Boolean(adminSupabase)
@@ -249,7 +268,7 @@ export async function POST(request: Request) {
         appointmentId: row.id,
         payload: {
           date: payload.date,
-          time: payload.time,
+          time: normalizedTime,
           whatsapp: payload.whatsapp
         },
         adminSupabaseAvailable: Boolean(adminSupabase)
@@ -259,7 +278,7 @@ export async function POST(request: Request) {
         createdAppointmentId,
         payload: {
           date: payload.date,
-          time: payload.time,
+          time: normalizedTime,
           whatsapp: payload.whatsapp
         },
         adminSupabaseAvailable: Boolean(adminSupabase)
