@@ -53,6 +53,20 @@ const DEFAULT_TIME_ZONE = "America/Monterrey";
 const DEFAULT_DURATION_MINUTES = 20;
 const MAX_EVENTS_PER_SLOT = 2;
 
+class GoogleCalendarApiError extends Error {
+  status: number;
+  responseBody: string;
+  requestInfo?: Record<string, string>;
+
+  constructor(message: string, status: number, responseBody: string, requestInfo?: Record<string, string>) {
+    super(message);
+    this.name = "GoogleCalendarApiError";
+    this.status = status;
+    this.responseBody = responseBody;
+    this.requestInfo = requestInfo;
+  }
+}
+
 function getCalendarConfig() {
   return {
     calendarId: (process.env.GOOGLE_CALENDAR_ID ?? "").trim(),
@@ -74,6 +88,14 @@ function base64Url(value: string) {
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
+}
+
+function safeJson(value: unknown) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 async function getGoogleAccessToken() {
@@ -138,6 +160,24 @@ function addMinutes(date: string, time: string, minutes: number) {
   return `${date}T${fromMinutes(total)}:00`;
 }
 
+function addDays(date: string, days: number) {
+  const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function getMonterreyOffset() {
+  return "-06:00";
+}
+
+function getDayRange(date: string) {
+  const offset = getMonterreyOffset();
+  return {
+    timeMin: `${date}T00:00:00${offset}`,
+    timeMax: `${addDays(date, 1)}T00:00:00${offset}`
+  };
+}
+
 function getStatusLabel(status: AppointmentStatus) {
   return status === "confirmed"
     ? "Confirmada"
@@ -176,7 +216,7 @@ function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = a
   };
 }
 
-async function callGoogleCalendar(path: string, init: RequestInit) {
+async function callGoogleCalendar(path: string, init: RequestInit, requestInfo?: Record<string, string>) {
   const config = getCalendarConfig();
   const accessToken = await getGoogleAccessToken();
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(config.calendarId)}${path}`;
@@ -192,7 +232,17 @@ async function callGoogleCalendar(path: string, init: RequestInit) {
   const body = (await response.json().catch(() => ({}))) as GoogleCalendarEventResponse | GoogleCalendarEventsResponse;
 
   if (!response.ok) {
-    throw new Error(body.error?.message ?? "No se pudo actualizar Google Calendar.");
+    const message = body.error?.message ?? "No se pudo actualizar Google Calendar.";
+    const responseBody = safeJson(body);
+
+    console.error("Google Calendar API error", {
+      status: response.status,
+      message,
+      responseBody,
+      requestInfo
+    });
+
+    throw new GoogleCalendarApiError(message, response.status, responseBody, requestInfo);
   }
 
   return body;
@@ -252,16 +302,21 @@ async function listGoogleCalendarEvents(date: string) {
   }
 
   const config = getCalendarConfig();
+  const { timeMin, timeMax } = getDayRange(date);
   const params = new URLSearchParams({
-    timeMin: `${date}T00:00:00`,
-    timeMax: `${date}T23:59:59`,
+    timeMin,
+    timeMax,
     timeZone: config.timeZone,
     singleEvents: "true",
     showDeleted: "false",
     orderBy: "startTime"
   });
 
-  const body = await callGoogleCalendar(`/events?${params.toString()}`, { method: "GET" }) as GoogleCalendarEventsResponse;
+  const body = await callGoogleCalendar(`/events?${params.toString()}`, { method: "GET" }, {
+    timeMin,
+    timeMax,
+    timeZone: config.timeZone
+  }) as GoogleCalendarEventsResponse;
   return (body.items ?? []).filter((event) => event.status !== "cancelled");
 }
 
