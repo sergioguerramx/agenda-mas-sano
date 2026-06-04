@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent } from "@/services/google-calendar";
+import { upsertGoogleContact } from "@/services/google-contacts";
 import { sendInternalAppointmentEmail } from "@/services/resend";
 import type { AppointmentRow } from "@/types/appointments";
 
@@ -118,6 +119,26 @@ export async function POST(request: Request) {
     } catch (calendarError) {
       automationStatus.calendar = "failed";
       logAutomationError("Google Calendar appointment automation error", calendarError);
+    }
+
+    try {
+      const googleContactResult = await upsertGoogleContact(row);
+      automationStatus.googleContact = googleContactResult.status;
+
+      if (googleContactResult.resourceName && adminSupabase && row.id) {
+        await adminSupabase
+          .from("appointments")
+          .update({ google_contact_id: googleContactResult.resourceName })
+          .eq("id", row.id);
+
+        await adminSupabase
+          .from("contacts")
+          .update({ google_contact_resource_name: googleContactResult.resourceName })
+          .eq("whatsapp", row.whatsapp);
+      }
+    } catch (googleContactError) {
+      automationStatus.googleContact = "failed";
+      logAutomationWarning("Google Contacts appointment automation warning", googleContactError);
     }
 
     try {
