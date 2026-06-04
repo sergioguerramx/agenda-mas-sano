@@ -17,6 +17,8 @@ type RequestPayload = {
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
 type PublicAppointmentResponse = { success: boolean; appointment_id?: string };
 
+const SLOT_TAKEN_MESSAGE = "Este horario acaba de ocuparse. Elige otro horario disponible.";
+
 function readErrorField(error: unknown, field: string) {
   if (!error || typeof error !== "object" || !(field in error)) return undefined;
   const value = (error as Record<string, unknown>)[field];
@@ -45,6 +47,18 @@ function getAutomationErrorDetails(error: unknown) {
     stack: error instanceof Error ? error.stack : readErrorField(error, "stack"),
     raw: stringifyError(error)
   };
+}
+
+function isSlotCapacityError(error: unknown) {
+  const details = getAutomationErrorDetails(error);
+  const text = [details.message, details.code, details.details, details.hint, details.raw]
+    .filter(Boolean)
+    .join(" ");
+
+  return text.includes("appointments_slot_capacity_guard")
+    || text.includes("Este horario ya no tiene lugares disponibles")
+    || text.includes("Este horario ya tiene el maximo de citas permitido")
+    || (text.includes("duplicate key") && text.includes("appointments"));
 }
 
 function logAutomationError(context: string, error: unknown, extra?: Record<string, unknown>) {
@@ -299,6 +313,21 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, automationStatus });
   } catch (error) {
+    if (isSlotCapacityError(error)) {
+      logAutomationWarning("Appointment slot capacity warning", error, {
+        payload: {
+          date: payload.date,
+          time: payload.time,
+          whatsapp: payload.whatsapp
+        }
+      });
+
+      return NextResponse.json(
+        { error: SLOT_TAKEN_MESSAGE },
+        { status: 409 }
+      );
+    }
+
     const safeError = error as SupabaseSafeError;
     console.error("Supabase request_public_appointment server error", getAutomationErrorDetails(error));
 
