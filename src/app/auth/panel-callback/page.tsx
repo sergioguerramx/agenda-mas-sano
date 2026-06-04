@@ -28,6 +28,8 @@ export default function PanelAuthCallbackPage() {
           if (error) throw error;
         }
 
+        await supabase.auth.getSession();
+
         window.location.replace("/panel");
       } catch (error) {
         const detail = error instanceof Error ? error.message : "No se pudo completar el login.";
