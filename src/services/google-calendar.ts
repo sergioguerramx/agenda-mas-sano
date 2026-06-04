@@ -35,6 +35,11 @@ type CalendarResult = {
   reason?: string;
 };
 
+type LocalDateTime = {
+  date: string;
+  minutes: number;
+};
+
 export type CalendarSlotCount = {
   time: string;
   count: number;
@@ -193,16 +198,52 @@ async function callGoogleCalendar(path: string, init: RequestInit) {
   return body;
 }
 
-function getEventStart(event: GoogleCalendarEvent, date: string) {
-  if (event.start?.dateTime) return new Date(event.start.dateTime).getTime();
-  if (event.start?.date) return new Date(`${event.start.date}T00:00:00`).getTime();
-  return new Date(`${date}T00:00:00`).getTime();
+function localDateTimeFromGoogleDateTime(value: string, timeZone: string): LocalDateTime {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date(value));
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${lookup.year}-${lookup.month}-${lookup.day}`,
+    minutes: Number(lookup.hour ?? 0) * 60 + Number(lookup.minute ?? 0)
+  };
 }
 
-function getEventEnd(event: GoogleCalendarEvent, date: string) {
-  if (event.end?.dateTime) return new Date(event.end.dateTime).getTime();
-  if (event.end?.date) return new Date(`${event.end.date}T00:00:00`).getTime();
-  return new Date(`${date}T23:59:59`).getTime();
+function compareDate(a: string, b: string) {
+  return a.localeCompare(b);
+}
+
+function getEventWindowForDate(event: GoogleCalendarEvent, date: string, timeZone: string) {
+  if (event.start?.date || event.end?.date) {
+    const startDate = event.start?.date ?? date;
+    const endDate = event.end?.date ?? date;
+    if (compareDate(startDate, date) <= 0 && compareDate(date, endDate) < 0) {
+      return { start: 0, end: 24 * 60 };
+    }
+    return null;
+  }
+
+  if (!event.start?.dateTime || !event.end?.dateTime) return null;
+
+  const start = localDateTimeFromGoogleDateTime(event.start.dateTime, timeZone);
+  const end = localDateTimeFromGoogleDateTime(event.end.dateTime, timeZone);
+
+  if (compareDate(start.date, date) > 0 || compareDate(end.date, date) < 0) return null;
+  if (compareDate(end.date, date) === 0 && end.minutes === 0 && compareDate(start.date, date) < 0) {
+    return null;
+  }
+
+  const startMinutes = compareDate(start.date, date) < 0 ? 0 : start.minutes;
+  const endMinutes = compareDate(end.date, date) > 0 ? 24 * 60 : end.minutes;
+
+  if (endMinutes <= startMinutes) return null;
+  return { start: startMinutes, end: endMinutes };
 }
 
 async function listGoogleCalendarEvents(date: string) {
@@ -227,11 +268,14 @@ async function listGoogleCalendarEvents(date: string) {
 export async function getGoogleCalendarSlotCounts(date: string, slotTimes: string[]): Promise<CalendarSlotCount[]> {
   const config = getCalendarConfig();
   const events = await listGoogleCalendarEvents(date);
+  const windows = events
+    .map((event) => getEventWindowForDate(event, date, config.timeZone))
+    .filter((window): window is { start: number; end: number } => Boolean(window));
 
   return slotTimes.map((time) => {
-    const slotStart = new Date(`${date}T${time}:00`).getTime();
-    const slotEnd = new Date(addMinutes(date, time, config.durationMinutes)).getTime();
-    const count = events.filter((event) => getEventStart(event, date) < slotEnd && getEventEnd(event, date) > slotStart).length;
+    const slotStart = toMinutes(time);
+    const slotEnd = slotStart + config.durationMinutes;
+    const count = windows.filter((event) => event.start < slotEnd && event.end > slotStart).length;
     return { time, count };
   });
 }
