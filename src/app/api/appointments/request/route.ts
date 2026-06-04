@@ -75,6 +75,26 @@ function logAutomationWarning(context: string, error: unknown, extra?: Record<st
   });
 }
 
+async function getSlotDiagnostics(payload: RequestPayload) {
+  try {
+    const adminSupabase = createSupabaseServiceRoleClient();
+    const { data, error } = await adminSupabase
+      .from("appointments")
+      .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, created_at, updated_at")
+      .eq("appointment_date", payload.date)
+      .eq("appointment_time", payload.time)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return { diagnosticError: getAutomationErrorDetails(error) };
+    }
+
+    return { appointments: data ?? [] };
+  } catch (diagnosticError) {
+    return { diagnosticError: getAutomationErrorDetails(diagnosticError) };
+  }
+}
+
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Falta conectar Supabase." }, { status: 500 });
@@ -96,8 +116,24 @@ export async function POST(request: Request) {
     const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(payload.date, payload.time);
 
     if (!calendarSlotAvailable) {
+      console.warn("Appointment rejected by Google Calendar availability", {
+        payload: {
+          date: payload.date,
+          time: payload.time,
+          whatsapp: payload.whatsapp
+        }
+      });
+
       return NextResponse.json({ error: SLOT_TAKEN_MESSAGE }, { status: 409 });
     }
+
+    console.info("Appointment Google Calendar availability passed", {
+      payload: {
+        date: payload.date,
+        time: payload.time,
+        whatsapp: payload.whatsapp
+      }
+    });
 
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase.rpc("request_public_appointment", {
@@ -324,12 +360,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, automationStatus });
   } catch (error) {
     if (isSlotCapacityError(error)) {
-      logAutomationWarning("Appointment slot capacity warning", error, {
+      const diagnostics = await getSlotDiagnostics(payload);
+
+      logAutomationWarning("Appointment rejected by Supabase capacity after Calendar availability passed", error, {
         payload: {
           date: payload.date,
           time: payload.time,
           whatsapp: payload.whatsapp
-        }
+        },
+        diagnostics
       });
 
       return NextResponse.json(
