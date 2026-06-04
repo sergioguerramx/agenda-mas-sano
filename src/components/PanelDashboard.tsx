@@ -3,7 +3,6 @@
 import { Copy, Download, LogIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { PANEL_AUTH_REDIRECT_KEY } from "@/components/AuthRedirectHandler";
 import { isAllowedAdminEmail } from "@/lib/admin";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { Appointment, AppointmentRow, AppointmentStatus, Contact, ContactRow } from "@/types/appointments";
@@ -27,7 +26,7 @@ function getPanelRedirectUrl() {
       : PRODUCTION_SITE_URL
     : browserOrigin;
 
-  return `${safeSiteUrl}/panel`;
+  return `${safeSiteUrl}/auth/callback?next=/panel`;
 }
 
 function toAppointment(row: AppointmentRow): Appointment {
@@ -220,8 +219,6 @@ export function PanelDashboard() {
 
   async function login() {
     if (!supabase) return;
-
-    window.localStorage.setItem(PANEL_AUTH_REDIRECT_KEY, "panel");
 
     await supabase.auth.signInWithOAuth({
       provider: "google",
