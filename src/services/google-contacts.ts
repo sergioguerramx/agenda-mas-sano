@@ -21,7 +21,7 @@ type GooglePerson = {
 
 type GooglePeopleResponse = {
   results?: Array<{ person?: GooglePerson }>;
-  error?: { message?: string };
+  error?: { message?: string; code?: number; status?: string; details?: unknown[] };
 };
 
 type GoogleContactResult = {
@@ -35,6 +35,20 @@ const GOOGLE_PEOPLE_BASE_URL = "https://people.googleapis.com/v1";
 const GOOGLE_CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
 
 let tokenCache: { accessToken: string; expiresAt: number } | null = null;
+
+class GoogleContactsApiError extends Error {
+  endpoint: string;
+  status: number;
+  responseBody: string;
+
+  constructor(message: string, endpoint: string, status: number, responseBody: string) {
+    super(message);
+    this.name = "GoogleContactsApiError";
+    this.endpoint = endpoint;
+    this.status = status;
+    this.responseBody = responseBody;
+  }
+}
 
 function getContactsConfig() {
   return {
@@ -57,6 +71,14 @@ function getGroupResourceName(groupId: string) {
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function safeJson(value: unknown) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 async function getGoogleContactsAccessToken() {
@@ -84,7 +106,14 @@ async function getGoogleContactsAccessToken() {
   const body = (await response.json().catch(() => ({}))) as GoogleOAuthResponse;
 
   if (!response.ok || !body.access_token) {
-    throw new Error(body.error_description ?? body.error ?? "No se pudo conectar Google Contacts.");
+    const message = body.error_description ?? body.error ?? "No se pudo conectar Google Contacts.";
+    console.warn("Google Contacts OAuth token error", {
+      endpoint: GOOGLE_TOKEN_URL,
+      status: response.status,
+      responseBody: safeJson(body),
+      message
+    });
+    throw new GoogleContactsApiError(message, GOOGLE_TOKEN_URL, response.status, safeJson(body));
   }
 
   tokenCache = {
@@ -96,8 +125,9 @@ async function getGoogleContactsAccessToken() {
 }
 
 async function callPeopleApi(path: string, init: RequestInit = {}) {
+  const endpoint = `${GOOGLE_PEOPLE_BASE_URL}${path}`;
   const accessToken = await getGoogleContactsAccessToken();
-  const response = await fetch(`${GOOGLE_PEOPLE_BASE_URL}${path}`, {
+  const response = await fetch(endpoint, {
     ...init,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -109,7 +139,18 @@ async function callPeopleApi(path: string, init: RequestInit = {}) {
 
   if (!response.ok) {
     const message = "error" in body ? body.error?.message : "";
-    throw new Error(message ?? "No se pudo actualizar Google Contacts.");
+    const errorMessage = message || "No se pudo actualizar Google Contacts.";
+    const responseBody = safeJson(body);
+
+    console.warn("Google People API error", {
+      endpoint,
+      path,
+      status: response.status,
+      responseBody,
+      message: errorMessage
+    });
+
+    throw new GoogleContactsApiError(errorMessage, endpoint, response.status, responseBody);
   }
 
   return body;
@@ -166,6 +207,11 @@ export async function upsertGoogleContact(appointment: AppointmentRow): Promise<
     return { status: "skipped", reason: "Google Contacts no esta configurado." };
   }
 
+  console.info("Google Contacts service attempt started", {
+    appointmentId: appointment.id,
+    whatsapp: appointment.whatsapp
+  });
+
   const existing = await searchGoogleContactByPhone(appointment.whatsapp);
 
   if (existing?.resourceName) {
@@ -181,6 +227,12 @@ export async function upsertGoogleContact(appointment: AppointmentRow): Promise<
       }
     ) as GooglePerson;
 
+    console.info("Google Contacts service result", {
+      status: "updated",
+      resourceName: updated.resourceName ?? existing.resourceName,
+      appointmentId: appointment.id
+    });
+
     return { status: "updated", resourceName: updated.resourceName ?? existing.resourceName };
   }
 
@@ -191,6 +243,12 @@ export async function upsertGoogleContact(appointment: AppointmentRow): Promise<
       body: JSON.stringify(buildContactPerson(appointment))
     }
   ) as GooglePerson;
+
+  console.info("Google Contacts service result", {
+    status: "created",
+    resourceName: created.resourceName,
+    appointmentId: appointment.id
+  });
 
   return { status: "created", resourceName: created.resourceName };
 }
