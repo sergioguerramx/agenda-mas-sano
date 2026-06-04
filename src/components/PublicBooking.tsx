@@ -3,12 +3,10 @@
 import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
-import { getSupabaseConfig, getSupabaseConfigError, isSupabaseConfigured } from "@/lib/supabase";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
-type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
 type SlotCountRow = { appointment_time: string; active_count: number };
 
 const emptyDraft: AppointmentDraft = {
@@ -18,48 +16,6 @@ const emptyDraft: AppointmentDraft = {
   date: "",
   time: ""
 };
-
-function logSupabaseError(context: string, supabaseError: unknown) {
-  const safeError = supabaseError as SupabaseSafeError;
-  console.error(context, {
-    message: safeError.message,
-    code: safeError.code,
-    details: safeError.details,
-    hint: safeError.hint
-  });
-}
-
-async function callPublicRpc<T>(functionName: string, payload: Record<string, unknown>) {
-  const config = getSupabaseConfig();
-  const configError = getSupabaseConfigError();
-
-  if (configError) {
-    throw new Error(configError);
-  }
-
-  const response = await fetch(`${config.url.replace(/\/+$/, "")}/rest/v1/rpc/${functionName}`, {
-    method: "POST",
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as SupabaseSafeError & { error?: string };
-    const message = body.message ?? body.error ?? body.details ?? `Supabase respondio con error ${response.status}.`;
-    const error = new Error(message) as Error & SupabaseSafeError;
-    error.code = body.code;
-    error.details = body.details;
-    error.hint = body.hint;
-    throw error;
-  }
-
-  return (await response.json().catch(() => undefined)) as T;
-}
 
 export function PublicBooking() {
   const [step, setStep] = useState<Step>("date");
@@ -79,20 +35,18 @@ export function PublicBooking() {
     async function loadReservedSlots() {
       if (!draft.date) return;
 
-      if (!isSupabaseConfigured()) {
-        setReservedSlots({});
-        setError("Falta conectar Supabase para ver horarios reales.");
-        return;
-      }
-
       setLoadingSlots(true);
       setError("");
 
       try {
-        const data = await callPublicRpc<SlotCountRow[]>("public_slot_counts", {
-          start_date: draft.date,
-          end_date: draft.date
-        });
+        const response = await fetch(`/api/calendar/availability?date=${encodeURIComponent(draft.date)}`);
+
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? "No se pudieron cargar los horarios reales.");
+        }
+
+        const data = (await response.json().catch(() => [])) as SlotCountRow[];
 
         if (ignore) return;
 
@@ -101,13 +55,17 @@ export function PublicBooking() {
           nextSlots[row.appointment_time.slice(0, 5)] = Number(row.active_count);
         });
         setReservedSlots(nextSlots);
-      } catch (supabaseError) {
+      } catch (calendarError) {
         if (!ignore) {
-          const config = getSupabaseConfig();
-          logSupabaseError("Supabase public_slot_counts error", supabaseError);
-          console.error("Supabase base URL used", { url: config.url });
-          setReservedSlots({});
-          setError("No se pudieron confirmar los lugares disponibles. Puedes elegir horario; al confirmar validaremos disponibilidad.");
+          const blockedSlots: ReservedSlots = {};
+          buildSlotsForDate(draft.date, new Date()).forEach((slot) => {
+            blockedSlots[slot.time] = 2;
+          });
+          console.error("Google Calendar availability error", {
+            message: calendarError instanceof Error ? calendarError.message : "No se pudo cargar Calendar."
+          });
+          setReservedSlots(blockedSlots);
+          setError("No se pudieron cargar los horarios reales de Google Calendar. Intenta de nuevo.");
         }
       } finally {
         if (!ignore) setLoadingSlots(false);
@@ -139,11 +97,6 @@ export function PublicBooking() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
-      setError("Falta conectar Supabase para guardar la cita.");
-      return;
-    }
-
     setSaving(true);
     setDraft((current) => ({ ...current, whatsapp }));
     setError("");
@@ -168,9 +121,7 @@ export function PublicBooking() {
 
       setStep("done");
     } catch (bookingError) {
-      const message = bookingError instanceof Error
-        ? bookingError.message
-        : (bookingError as SupabaseSafeError).message;
+      const message = bookingError instanceof Error ? bookingError.message : "No se pudo guardar la cita.";
       setError(message ? `No se pudo guardar la cita: ${message}` : "No se pudo guardar la cita. Intenta de nuevo.");
     } finally {
       setSaving(false);
