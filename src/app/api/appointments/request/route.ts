@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
-import { createGoogleCalendarEvent } from "@/services/google-calendar";
+import { createGoogleCalendarEvent, isGoogleCalendarSlotAvailable } from "@/services/google-calendar";
 import { isGoogleContactsConfigured, upsertGoogleContact } from "@/services/google-contacts";
 import { sendInternalAppointmentEmail } from "@/services/resend";
 import type { AppointmentRow } from "@/types/appointments";
@@ -89,6 +89,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (!payload.date || !payload.time) {
+      return NextResponse.json({ error: "Elige fecha y horario para continuar." }, { status: 400 });
+    }
+
+    const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(payload.date, payload.time);
+
+    if (!calendarSlotAvailable) {
+      return NextResponse.json({ error: SLOT_TAKEN_MESSAGE }, { status: 409 });
+    }
+
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase.rpc("request_public_appointment", {
       p_first_name: payload.firstName,
