@@ -107,23 +107,31 @@ function addMinutes(date: string, time: string, minutes: number) {
   return `${date}T${String(nextHour).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}:00`;
 }
 
-function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = appointment.status) {
-  const config = getCalendarConfig();
-  const patientName = `${appointment.first_name} ${appointment.last_name}`.trim();
-  const statusLabel = status === "confirmed"
+function getStatusLabel(status: AppointmentStatus) {
+  return status === "confirmed"
     ? "Confirmada"
     : status === "cancelled"
       ? "Cancelada"
       : status === "completed"
         ? "Completada"
-        : "Pendiente";
+        : "Agendada";
+}
+
+function getPatientName(appointment: AppointmentRow) {
+  return `${appointment.first_name} ${appointment.last_name}`.replace(/\s+/g, " ").trim();
+}
+
+function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = appointment.status) {
+  const config = getCalendarConfig();
+  const patientName = getPatientName(appointment);
+  const statusLabel = getStatusLabel(status);
 
   return {
-    summary: `${statusLabel} - ${patientName}`,
+    summary: `PX $399 - ${patientName}`,
     description: [
       `Paciente: ${patientName}`,
       `WhatsApp: ${appointment.whatsapp}`,
-      `Estado: ${statusLabel}`,
+      `Estado interno: ${statusLabel}`,
       "Origen: Agenda Mas Sano"
     ].join("\n"),
     start: {
