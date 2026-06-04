@@ -15,6 +15,7 @@ const labels: Record<AppointmentStatus, string> = {
 };
 
 const PRODUCTION_SITE_URL = "https://agenda-mas-sano.vercel.app";
+const PANEL_REQUEST_TIMEOUT_MS = 12000;
 type PanelView = "appointments" | "contacts";
 
 function getPanelRedirectUrl() {
@@ -84,14 +85,30 @@ function exportCsv(filename: string, rows: Array<Record<string, string | number>
   URL.revokeObjectURL(url);
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function withPanelTimeout<T>(promise: PromiseLike<T>, message: string) {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), PANEL_REQUEST_TIMEOUT_MS);
+    })
+  ]);
+}
+
 async function checkAdminAccess(client: SupabaseClient, email: string) {
   if (!isAllowedAdminEmail(email)) return false;
 
-  const { data, error } = await client
-    .from("admin_users")
-    .select("email")
-    .eq("email", email)
-    .maybeSingle();
+  const { data, error } = await withPanelTimeout(
+    client
+      .from("admin_users")
+      .select("email")
+      .eq("email", email)
+      .maybeSingle(),
+    "No se pudo validar el acceso al panel. Intenta entrar de nuevo."
+  );
 
   return Boolean(!error && data);
 }
@@ -140,11 +157,14 @@ export function PanelDashboard() {
 
   const loadAppointments = useCallback(async (client: SupabaseClient) => {
     setMessage("");
-    const { data, error } = await client
-      .from("appointments")
-      .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status")
-      .order("appointment_date", { ascending: true })
-      .order("appointment_time", { ascending: true });
+    const { data, error } = await withPanelTimeout(
+      client
+        .from("appointments")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status")
+        .order("appointment_date", { ascending: true })
+        .order("appointment_time", { ascending: true }),
+      "No se pudieron cargar las citas. Intenta refrescar el panel."
+    );
 
     if (error) {
       setMessage("No se pudieron cargar las citas.");
@@ -155,11 +175,14 @@ export function PanelDashboard() {
   }, []);
 
   const loadContacts = useCallback(async (client: SupabaseClient) => {
-    const { data, error } = await client
-      .from("contacts")
-      .select("id, first_name, last_name, whatsapp, source, branch, first_appointment_date, last_appointment_date, total_appointments, latest_status, latest_appointment_id, created_at, updated_at")
-      .order("last_appointment_date", { ascending: false })
-      .order("updated_at", { ascending: false });
+    const { data, error } = await withPanelTimeout(
+      client
+        .from("contacts")
+        .select("id, first_name, last_name, whatsapp, source, branch, first_appointment_date, last_appointment_date, total_appointments, latest_status, latest_appointment_id, created_at, updated_at")
+        .order("last_appointment_date", { ascending: false })
+        .order("updated_at", { ascending: false }),
+      "No se pudieron cargar los contactos. Intenta refrescar el panel."
+    );
 
     if (error) {
       setMessage("No se pudieron cargar los contactos. Revisa que el SQL de Fase 4 ya este aplicado.");
@@ -170,6 +193,8 @@ export function PanelDashboard() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!isSupabaseConfigured()) {
       setMessage("Falta conectar Supabase.");
       setLoading(false);
@@ -179,42 +204,68 @@ export function PanelDashboard() {
     const client = createSupabaseBrowserClient();
     setSupabase(client);
 
-    client.auth.getSession().then(async ({ data }) => {
-      const currentSession = data.session;
+    async function applySession(currentSession: Session | null) {
       const email = currentSession?.user.email ?? "";
       const allowed = currentSession ? await checkAdminAccess(client, email) : false;
 
+      if (!isActive) return;
+
       setSession(currentSession);
       setIsAdmin(allowed);
+      setLoading(false);
 
       if (currentSession && allowed) {
-        await loadAppointments(client);
-        await loadContacts(client);
+        try {
+          await Promise.all([loadAppointments(client), loadContacts(client)]);
+        } catch (error) {
+          if (!isActive) return;
+          setMessage(getErrorMessage(error, "No se pudieron cargar todos los datos del panel."));
+        }
       } else if (currentSession && !allowed) {
         setMessage("Esta cuenta no tiene acceso al panel.");
-      }
-
-      setLoading(false);
-    });
-
-    const { data: listener } = client.auth.onAuthStateChange(async (_event, nextSession) => {
-      const email = nextSession?.user.email ?? "";
-      const allowed = nextSession ? await checkAdminAccess(client, email) : false;
-
-      setSession(nextSession);
-      setIsAdmin(allowed);
-
-      if (nextSession && allowed) {
-        await loadAppointments(client);
-        await loadContacts(client);
       } else {
         setItems([]);
         setContacts([]);
-        if (nextSession && !allowed) setMessage("Esta cuenta no tiene acceso al panel.");
       }
+    }
+
+    async function initializePanel() {
+      try {
+        const { data, error } = await withPanelTimeout(
+          client.auth.getSession(),
+          "No se pudo validar la sesion. Intenta entrar de nuevo."
+        );
+
+        if (error) throw error;
+
+        await applySession(data.session);
+      } catch (error) {
+        if (!isActive) return;
+
+        setSession(null);
+        setIsAdmin(false);
+        setItems([]);
+        setContacts([]);
+        setMessage(getErrorMessage(error, "No se pudo cargar el panel. Intenta entrar de nuevo."));
+        setLoading(false);
+      }
+    }
+
+    void initializePanel();
+
+    const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
+      window.setTimeout(() => {
+        void applySession(nextSession).catch((error) => {
+          setMessage(getErrorMessage(error, "No se pudo actualizar la sesion del panel."));
+          setLoading(false);
+        });
+      }, 0);
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      isActive = false;
+      listener.subscription.unsubscribe();
+    };
   }, [loadAppointments, loadContacts]);
 
   async function login() {
