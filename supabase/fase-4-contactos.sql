@@ -10,9 +10,13 @@ create table if not exists public.contacts (
   total_appointments integer not null default 1,
   latest_status text not null default 'pending' check (latest_status in ('pending', 'confirmed', 'cancelled', 'completed')),
   latest_appointment_id uuid references public.appointments(id) on delete set null,
+  google_contact_resource_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.contacts
+add column if not exists google_contact_resource_name text;
 
 create index if not exists contacts_name_idx on public.contacts (last_name, first_name);
 create index if not exists contacts_last_appointment_idx on public.contacts (last_appointment_date desc);
