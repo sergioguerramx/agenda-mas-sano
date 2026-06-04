@@ -16,6 +16,7 @@ function hasAuthResponse() {
 export function AuthRedirectHandler() {
   useEffect(() => {
     if (!hasAuthResponse() || !isSupabaseConfigured()) return;
+    if (window.location.pathname.replace(/\/+$/, "") === "/auth/callback") return;
 
     const requestedPanel = window.localStorage.getItem(PANEL_AUTH_REDIRECT_KEY) === "panel";
     const isPanelPath = window.location.pathname.replace(/\/+$/, "") === "/panel";
