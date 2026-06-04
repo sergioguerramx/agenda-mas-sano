@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto";
+import { getSlotCapacity } from "@/lib/schedule";
 import type { AppointmentRow, AppointmentStatus } from "@/types/appointments";
 
 type GoogleTokenResponse = {
@@ -51,7 +52,6 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const DEFAULT_TIME_ZONE = "America/Monterrey";
 const DEFAULT_DURATION_MINUTES = 20;
-const MAX_EVENTS_PER_SLOT = 2;
 
 class GoogleCalendarApiError extends Error {
   status: number;
@@ -337,7 +337,7 @@ export async function getGoogleCalendarSlotCounts(date: string, slotTimes: strin
 
 export async function isGoogleCalendarSlotAvailable(date: string, time: string) {
   const [slot] = await getGoogleCalendarSlotCounts(date, [time.slice(0, 5)]);
-  return (slot?.count ?? 0) < MAX_EVENTS_PER_SLOT;
+  return (slot?.count ?? 0) < getSlotCapacity(date, time);
 }
 
 export async function createGoogleCalendarEvent(appointment: AppointmentRow): Promise<CalendarResult> {
