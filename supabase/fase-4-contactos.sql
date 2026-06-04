@@ -28,7 +28,10 @@ create policy "Admins can manage contacts" on public.contacts
 for all using (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'))
 with check (exists (select 1 from public.admin_users where admin_users.email = auth.jwt() ->> 'email'));
 
+grant usage on schema public to service_role;
 grant select, insert, update on public.contacts to authenticated;
+grant select, insert, update, delete on public.appointments to service_role;
+grant select, insert, update, delete on public.contacts to service_role;
 
 create or replace function public.sync_contact_from_appointment(p_appointment_id uuid)
 returns void
@@ -109,6 +112,7 @@ end;
 $$;
 
 grant execute on function public.sync_contact_from_appointment(uuid) to authenticated;
+grant execute on function public.sync_contact_from_appointment(uuid) to service_role;
 
 drop function if exists public.request_public_appointment(text, text, text, date, time);
 
