@@ -91,8 +91,10 @@ Para conectar Supabase:
 Para que el login del panel regrese correctamente a `/panel`, Supabase Auth debe tener estas Redirect URLs permitidas:
 
 - `https://agenda-mas-sano.vercel.app/auth/callback`
+- `https://agenda-mas-sano.vercel.app/auth/panel-callback`
 - `https://agenda-mas-sano-git-fase-4-contactos-mas-sano-s-projects.vercel.app/auth/callback`
-- Cualquier nueva URL de preview que Vercel genere para probar PRs, terminando en `/auth/callback`.
+- `https://agenda-mas-sano-git-fase-4-contactos-mas-sano-s-projects.vercel.app/auth/panel-callback`
+- Cualquier nueva URL de preview que Vercel genere para probar PRs, terminando en `/auth/callback` y `/auth/panel-callback`.
 
 Ruta en Supabase:
 

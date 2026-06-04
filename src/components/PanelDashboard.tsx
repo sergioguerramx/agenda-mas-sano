@@ -26,7 +26,7 @@ function getPanelRedirectUrl() {
       : PRODUCTION_SITE_URL
     : browserOrigin;
 
-  return `${safeSiteUrl}/auth/callback?next=/panel`;
+  return `${safeSiteUrl}/auth/panel-callback`;
 }
 
 function toAppointment(row: AppointmentRow): Appointment {
