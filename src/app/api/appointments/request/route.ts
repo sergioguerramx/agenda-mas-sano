@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
+import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent } from "@/services/google-calendar";
 import { sendInternalAppointmentEmail } from "@/services/resend";
 import type { AppointmentRow } from "@/types/appointments";
@@ -13,6 +14,7 @@ type RequestPayload = {
 };
 
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
+type PublicAppointmentResponse = { success: boolean; appointment_id?: string };
 
 function logAutomationError(context: string, error: unknown) {
   console.error(context, {
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createSupabaseServerClient();
-    const { error } = await supabase.rpc("request_public_appointment", {
+    const { data, error } = await supabase.rpc("request_public_appointment", {
       p_first_name: payload.firstName,
       p_last_name: payload.lastName,
       p_whatsapp: payload.whatsapp,
@@ -51,9 +53,11 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
+    const createdAppointment = (data?.[0] ?? null) as PublicAppointmentResponse | null;
+    const createdAppointmentId = createdAppointment?.appointment_id ?? "";
     let adminSupabase: ReturnType<typeof createSupabaseServiceRoleClient> | null = null;
     let row: AppointmentRow = {
-      id: "",
+      id: createdAppointmentId,
       first_name: payload.firstName ?? "",
       last_name: payload.lastName ?? "",
       whatsapp: payload.whatsapp ?? "",
@@ -64,15 +68,22 @@ export async function POST(request: Request) {
 
     try {
       adminSupabase = createSupabaseServiceRoleClient();
-      const { data: appointment, error: appointmentError } = await adminSupabase
+      let appointmentQuery = adminSupabase
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, created_at, updated_at")
-        .eq("appointment_date", payload.date)
-        .eq("appointment_time", payload.time)
-        .eq("whatsapp", payload.whatsapp)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, created_at, updated_at");
+
+      if (createdAppointmentId) {
+        appointmentQuery = appointmentQuery.eq("id", createdAppointmentId);
+      } else {
+        appointmentQuery = appointmentQuery
+          .eq("appointment_date", payload.date)
+          .eq("appointment_time", payload.time)
+          .eq("whatsapp", payload.whatsapp)
+          .order("created_at", { ascending: false })
+          .limit(1);
+      }
+
+      const { data: appointment, error: appointmentError } = await appointmentQuery.maybeSingle();
 
       if (appointmentError || !appointment) {
         throw appointmentError ?? new Error("No se encontro la cita recien creada.");
@@ -84,6 +95,15 @@ export async function POST(request: Request) {
     }
 
     const automationStatus: Record<string, string> = {};
+
+    try {
+      if (!adminSupabase) throw new Error("No se pudo conectar contactos.");
+      const contactResult = await syncContactFromAppointment(adminSupabase, row.id);
+      automationStatus.contact = contactResult.status;
+    } catch (contactError) {
+      automationStatus.contact = "failed";
+      logAutomationWarning("Contact sync warning", contactError);
+    }
 
     try {
       const calendarResult = await createGoogleCalendarEvent(row);

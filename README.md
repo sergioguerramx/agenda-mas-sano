@@ -15,6 +15,7 @@ El proyecto ya conecta la agenda publica y el panel interno con Supabase real.
 - Panel interno en `/panel`.
 - Login con Supabase Auth y Google.
 - Lista real de citas con filtros, cambio de estado y copiado de WhatsApp.
+- Contactos internos en Supabase con busqueda y exportacion CSV.
 
 ## Correr localmente
 
@@ -70,6 +71,7 @@ El archivo `supabase/schema.sql` contiene las tablas iniciales:
 
 - `appointments`
 - `admin_users`
+- `contacts`
 
 Tambien agrega los correos permitidos para el panel:
 
@@ -82,7 +84,21 @@ Para conectar Supabase:
 2. Ejecutar `supabase/schema.sql`.
 3. Activar Google como proveedor de autenticacion.
 4. Completar las variables de Supabase en `.env.local`.
-5. Mantener Supabase como fuente principal de verdad para citas y administradores.
+5. Mantener Supabase como fuente principal de verdad para citas, contactos y administradores.
+
+### Login del panel
+
+Para que el login del panel regrese correctamente a `/panel`, Supabase Auth debe tener estas Redirect URLs permitidas:
+
+- `https://agenda-mas-sano.vercel.app/auth/callback`
+- `https://agenda-mas-sano.vercel.app/auth/panel-callback`
+- `https://agenda-mas-sano-git-fase-4-contactos-mas-sano-s-projects.vercel.app/auth/callback`
+- `https://agenda-mas-sano-git-fase-4-contactos-mas-sano-s-projects.vercel.app/auth/panel-callback`
+- Cualquier nueva URL de preview que Vercel genere para probar PRs, terminando en `/auth/callback` y `/auth/panel-callback`.
+
+Ruta en Supabase:
+
+Supabase -> Authentication -> URL Configuration -> Redirect URLs.
 
 ## Google Calendar
 
@@ -100,15 +116,16 @@ Para activarlo:
 4. Al crear una cita, se crea un evento pendiente y se guarda su ID en `appointments.google_calendar_event_id`.
 5. Al cambiar estado desde el panel, el evento se actualiza. Si la cita se cancela, el evento se elimina.
 
-## Google Contacts
+## Contactos internos
 
-Google Contacts queda pendiente para una fase posterior. Para conectarlo se debe:
+Google Contacts queda pendiente. Fase 4 usa primero contactos internos en Supabase porque es el camino mas estable.
 
-1. Activar People API en Google Cloud.
-2. Guardar el grupo de contactos en `GOOGLE_CONTACTS_GROUP_ID`.
-3. Crear o actualizar el contacto del paciente.
-4. Guardar el id del contacto en `appointments.google_contact_id`.
-5. Evitar duplicados buscando por WhatsApp antes de crear un contacto nuevo.
+Para activar contactos internos:
+
+1. Ejecutar `supabase/fase-4-contactos.sql` en Supabase.
+2. Cada cita nueva crea o actualiza un contacto usando WhatsApp para evitar duplicados.
+3. El panel muestra la pestaña Contactos con busqueda, copiado de WhatsApp e historial basico.
+4. El panel permite exportar contactos a CSV.
 
 ## Resend
 

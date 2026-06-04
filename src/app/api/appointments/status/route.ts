@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isAllowedAdminEmail } from "@/lib/admin";
 import { createSupabaseServiceRoleClient, getSupabaseConfig, getSupabaseConfigError } from "@/lib/supabase";
+import { syncContactFromAppointment } from "@/services/contacts";
 import { syncGoogleCalendarEventStatus } from "@/services/google-calendar";
 import type { AppointmentRow, AppointmentStatus } from "@/types/appointments";
 
@@ -79,6 +80,14 @@ export async function POST(request: Request) {
       .eq("id", payload.id);
 
     if (updateError) throw updateError;
+
+    try {
+      await syncContactFromAppointment(supabase, appointment.id);
+    } catch (contactError) {
+      console.warn("Contact status sync warning", {
+        message: contactError instanceof Error ? contactError.message : "Aviso sin detalle"
+      });
+    }
 
     let calendarStatus = "skipped";
 
