@@ -43,6 +43,9 @@ Variables preparadas:
 - `GOOGLE_PRIVATE_KEY`
 - `GOOGLE_CALENDAR_TIME_ZONE`
 - `GOOGLE_CALENDAR_EVENT_DURATION_MINUTES`
+- `GOOGLE_CONTACTS_CLIENT_ID`
+- `GOOGLE_CONTACTS_CLIENT_SECRET`
+- `GOOGLE_CONTACTS_REFRESH_TOKEN`
 - `GOOGLE_CONTACTS_GROUP_ID`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
@@ -116,9 +119,9 @@ Para activarlo:
 4. Al crear una cita, se crea un evento pendiente y se guarda su ID en `appointments.google_calendar_event_id`.
 5. Al cambiar estado desde el panel, el evento se actualiza. Si la cita se cancela, el evento se elimina.
 
-## Contactos internos
+## Contactos internos y Google Contacts
 
-Google Contacts queda pendiente. Fase 4 usa primero contactos internos en Supabase porque es el camino mas estable.
+Los contactos internos en Supabase siguen siendo la fuente estable. Google Contacts se puede activar despues con OAuth de una cuenta Google autorizada.
 
 Para activar contactos internos:
 
@@ -126,6 +129,18 @@ Para activar contactos internos:
 2. Cada cita nueva crea o actualiza un contacto usando WhatsApp para evitar duplicados.
 3. El panel muestra la pestaña Contactos con busqueda, copiado de WhatsApp e historial basico.
 4. El panel permite exportar contactos a CSV.
+
+Para activar Google Contacts:
+
+1. Activar Google People API en Google Cloud.
+2. Crear credenciales OAuth para la cuenta Google que recibira los contactos.
+3. Autorizar el permiso de contactos y generar un refresh token.
+4. Guardar en Vercel:
+   - `GOOGLE_CONTACTS_CLIENT_ID`
+   - `GOOGLE_CONTACTS_CLIENT_SECRET`
+   - `GOOGLE_CONTACTS_REFRESH_TOKEN`
+   - `GOOGLE_CONTACTS_GROUP_ID` si quieres mandar los contactos a una etiqueta/grupo especifico.
+5. Cada cita nueva intentara crear o actualizar el contacto en Google Contacts usando el WhatsApp. Si Google Contacts falla, la cita y Google Calendar no se rompen.
 
 ## Resend
 
