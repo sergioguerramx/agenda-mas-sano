@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { buildSlotsForDate } from "@/lib/schedule";
 import { getGoogleCalendarSlotCounts } from "@/services/google-calendar";
 
+function getErrorDetails(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return { message: String(error) };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : (error as { message?: string }).message,
+    name: error instanceof Error ? error.name : (error as { name?: string }).name,
+    status: (error as { status?: number }).status,
+    responseBody: (error as { responseBody?: string }).responseBody,
+    requestInfo: (error as { requestInfo?: Record<string, string> }).requestInfo
+  };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") ?? "";
@@ -21,9 +35,7 @@ export async function GET(request: Request) {
       }))
     );
   } catch (error) {
-    console.error("Google Calendar availability error", {
-      message: error instanceof Error ? error.message : "No se pudo leer Google Calendar."
-    });
+    console.error("Google Calendar availability error", getErrorDetails(error));
 
     return NextResponse.json(
       { error: "No se pudieron cargar los horarios reales de Google Calendar." },
