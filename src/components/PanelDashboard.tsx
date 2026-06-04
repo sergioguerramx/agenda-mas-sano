@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Download, LogIn } from "lucide-react";
+import { Copy, Download, LogIn, MessageCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { isAllowedAdminEmail } from "@/lib/admin";
@@ -8,7 +8,7 @@ import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabas
 import type { Appointment, AppointmentRow, AppointmentStatus, Contact, ContactRow } from "@/types/appointments";
 
 const labels: Record<AppointmentStatus, string> = {
-  pending: "pendiente",
+  pending: "agendada",
   confirmed: "confirmada",
   cancelled: "cancelada",
   completed: "completada"
@@ -98,6 +98,26 @@ function withPanelTimeout<T>(promise: PromiseLike<T>, message: string) {
   ]);
 }
 
+function formatContactName(firstName: string, lastName: string) {
+  return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim();
+}
+
+function getWhatsAppUrl(whatsapp: string) {
+  const digits = whatsapp.replace(/\D/g, "");
+  return `https://wa.me/${digits}`;
+}
+
+function openWhatsApp(whatsapp: string) {
+  window.open(getWhatsAppUrl(whatsapp), "_blank", "noopener,noreferrer");
+}
+
+function formatHistory(history: Appointment[]) {
+  return history
+    .slice(0, 4)
+    .map((item) => `${item.date} ${item.time} ${labels[item.status]}`)
+    .join(" | ");
+}
+
 async function checkAdminAccess(client: SupabaseClient, email: string) {
   if (!isAllowedAdminEmail(email)) return false;
 
@@ -119,19 +139,12 @@ export function PanelDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState("");
-  const [status, setStatus] = useState<"all" | AppointmentStatus>("all");
   const [view, setView] = useState<PanelView>("appointments");
   const [items, setItems] = useState<Appointment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactSearch, setContactSearch] = useState("");
   const [contactDate, setContactDate] = useState("");
-  const [contactStatus, setContactStatus] = useState<"all" | AppointmentStatus>("all");
   const [message, setMessage] = useState("");
-
-  const filtered = useMemo(
-    () => items.filter((item) => (!date || item.date === date) && (status === "all" || item.status === status)),
-    [items, date, status]
-  );
 
   const appointmentHistoryByWhatsapp = useMemo(() => {
     const grouped = new Map<string, Appointment[]>();
@@ -145,15 +158,25 @@ export function PanelDashboard() {
     return grouped;
   }, [items]);
 
+  const contactByWhatsapp = useMemo(() => {
+    const map = new Map<string, Contact>();
+    contacts.forEach((contact) => map.set(contact.whatsapp, contact));
+    return map;
+  }, [contacts]);
+
+  const filtered = useMemo(
+    () => items.filter((item) => !date || item.date === date),
+    [items, date]
+  );
+
   const filteredContacts = useMemo(() => {
     const search = contactSearch.trim().toLowerCase();
     return contacts.filter((contact) => {
       const matchesSearch = !search || `${contact.firstName} ${contact.lastName} ${contact.whatsapp}`.toLowerCase().includes(search);
       const matchesDate = !contactDate || contact.lastAppointmentDate === contactDate || contact.firstAppointmentDate === contactDate;
-      const matchesStatus = contactStatus === "all" || contact.latestStatus === contactStatus;
-      return matchesSearch && matchesDate && matchesStatus;
+      return matchesSearch && matchesDate;
     });
-  }, [contacts, contactDate, contactSearch, contactStatus]);
+  }, [contacts, contactDate, contactSearch]);
 
   const loadAppointments = useCallback(async (client: SupabaseClient) => {
     setMessage("");
@@ -283,31 +306,7 @@ export function PanelDashboard() {
     setSession(null);
     setIsAdmin(false);
     setItems([]);
-  }
-
-  async function updateStatus(id: string, next: AppointmentStatus) {
-    if (!supabase || !session) return;
-
-    const previous = items;
-    setItems((all) => all.map((item) => (item.id === id ? { ...item, status: next } : item)));
-
-    const response = await fetch("/api/appointments/status", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ id, status: next })
-    });
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setItems(previous);
-      setMessage(body.error ?? "No se pudo cambiar el estado.");
-      return;
-    }
-
-    await loadContacts(supabase);
+    setContacts([]);
   }
 
   function exportContacts() {
@@ -356,10 +355,10 @@ export function PanelDashboard() {
   return (
     <main className="page">
       <div className="shell">
-        <header className="top"><div><p className="eyebrow">Panel interno</p><h1 className="title">{view === "appointments" ? "Citas" : "Contactos"}</h1></div><button className="secondary" onClick={logout} type="button">Salir</button></header>
+        <header className="top"><div><p className="eyebrow">Panel interno</p><h1 className="title">{view === "appointments" ? "Agenda" : "Contactos"}</h1></div><button className="secondary" onClick={logout} type="button">Salir</button></header>
         <section className="card panel-card">
           <div className="tabs">
-            <button className={view === "appointments" ? "active" : ""} onClick={() => setView("appointments")} type="button">Citas</button>
+            <button className={view === "appointments" ? "active" : ""} onClick={() => setView("appointments")} type="button">Agenda</button>
             <button className={view === "contacts" ? "active" : ""} onClick={() => setView("contacts")} type="button">Contactos</button>
           </div>
           {message && <p className="error">{message}</p>}
@@ -367,19 +366,29 @@ export function PanelDashboard() {
             <>
               <div className="filters">
                 <div className="field"><label htmlFor="dateFilter">Fecha</label><input id="dateFilter" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
-                <div className="field"><label htmlFor="statusFilter">Estado</label><select id="statusFilter" value={status} onChange={(event) => setStatus(event.target.value as "all" | AppointmentStatus)}><option value="all">todos</option><option value="pending">pendiente</option><option value="confirmed">confirmada</option><option value="cancelled">cancelada</option><option value="completed">completada</option></select></div>
               </div>
               <div className="list">
-                {filtered.map((item) => (
-                  <article className="apt" key={item.id}>
-                    <div><strong>{item.firstName} {item.lastName}</strong><p className="copy">{item.date} - {item.time} - {item.whatsapp}</p></div>
-                    <span className="badge">{labels[item.status]}</span>
-                    <div className="actions">
-                      <select value={item.status} onChange={(event) => updateStatus(item.id, event.target.value as AppointmentStatus)}><option value="pending">pendiente</option><option value="confirmed">confirmada</option><option value="cancelled">cancelada</option><option value="completed">completada</option></select>
-                      <button className="secondary" onClick={() => navigator.clipboard.writeText(item.whatsapp)} type="button"><Copy size={17} />Copiar WhatsApp</button>
-                    </div>
-                  </article>
-                ))}
+                {filtered.map((item) => {
+                  const contact = contactByWhatsapp.get(item.whatsapp);
+                  const history = appointmentHistoryByWhatsapp.get(item.whatsapp) ?? [];
+                  const totalAppointments = contact?.totalAppointments ?? history.length;
+                  const lastAppointmentDate = contact?.lastAppointmentDate ?? item.date;
+                  return (
+                    <article className="apt" key={item.id}>
+                      <div>
+                        <strong>{item.date} - {item.time}</strong>
+                        <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
+                        <p className="copy">WhatsApp: {item.whatsapp}</p>
+                        <p className="copy">Total de citas: {totalAppointments} - Ultima cita: {lastAppointmentDate}</p>
+                        {history.length > 0 && <p className="copy">Historial: {formatHistory(history)}</p>}
+                      </div>
+                      <div className="actions">
+                        <button className="primary" onClick={() => openWhatsApp(item.whatsapp)} type="button"><MessageCircle size={17} />Abrir WhatsApp</button>
+                        <button className="secondary" onClick={() => navigator.clipboard.writeText(item.whatsapp)} type="button"><Copy size={17} />Copiar WhatsApp</button>
+                      </div>
+                    </article>
+                  );
+                })}
                 {filtered.length === 0 && <p className="copy">No hay citas con esos filtros.</p>}
               </div>
             </>
@@ -389,7 +398,6 @@ export function PanelDashboard() {
               <div className="filters">
                 <div className="field"><label htmlFor="contactSearch">Buscar</label><input id="contactSearch" type="search" placeholder="Nombre, apellido o WhatsApp" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} /></div>
                 <div className="field"><label htmlFor="contactDateFilter">Fecha</label><input id="contactDateFilter" type="date" value={contactDate} onChange={(event) => setContactDate(event.target.value)} /></div>
-                <div className="field"><label htmlFor="contactStatusFilter">Estado</label><select id="contactStatusFilter" value={contactStatus} onChange={(event) => setContactStatus(event.target.value as "all" | AppointmentStatus)}><option value="all">todos</option><option value="pending">pendiente</option><option value="confirmed">confirmada</option><option value="cancelled">cancelada</option><option value="completed">completada</option></select></div>
               </div>
               <div className="actions"><button className="secondary" onClick={exportContacts} type="button"><Download size={17} />Exportar CSV</button></div>
               <div className="list">
@@ -398,13 +406,15 @@ export function PanelDashboard() {
                   return (
                     <article className="apt contact-card" key={contact.id}>
                       <div>
-                        <strong>{contact.firstName} {contact.lastName}</strong>
-                        <p className="copy">{contact.whatsapp} - {contact.branch} - {contact.source}</p>
-                        <p className="copy">Primera cita: {contact.firstAppointmentDate} - Ultima cita: {contact.lastAppointmentDate} - Total: {contact.totalAppointments}</p>
-                        {history.length > 0 && <p className="copy">Historial: {history.slice(0, 3).map((item) => `${item.date} ${item.time} ${labels[item.status]}`).join(" | ")}</p>}
+                        <strong>{formatContactName(contact.firstName, contact.lastName)}</strong>
+                        <p className="copy">WhatsApp: {contact.whatsapp}</p>
+                        <p className="copy">{contact.branch} - {contact.source}</p>
+                        <p className="copy">Total de citas: {contact.totalAppointments} - Ultima cita: {contact.lastAppointmentDate}</p>
+                        <p className="copy">Primera cita: {contact.firstAppointmentDate}</p>
+                        {history.length > 0 && <p className="copy">Historial: {formatHistory(history)}</p>}
                       </div>
-                      <span className="badge">{labels[contact.latestStatus]}</span>
                       <div className="actions">
+                        <button className="primary" onClick={() => openWhatsApp(contact.whatsapp)} type="button"><MessageCircle size={17} />Abrir WhatsApp</button>
                         <button className="secondary" onClick={() => navigator.clipboard.writeText(contact.whatsapp)} type="button"><Copy size={17} />Copiar WhatsApp</button>
                       </div>
                     </article>
