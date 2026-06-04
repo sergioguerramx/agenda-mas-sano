@@ -33,7 +33,11 @@ begin
   where appointment_date = new.appointment_date
     and appointment_time = new.appointment_time
     and status in ('pending', 'confirmed')
-    and id <> coalesce(new.id, gen_random_uuid());
+    and id <> coalesce(new.id, gen_random_uuid())
+    and (
+      google_calendar_event_id is not null
+      or created_at >= now() - interval '5 minutes'
+    );
 
   if active_count >= slot_capacity then
     raise exception 'Este horario ya tiene el maximo de citas permitido';
@@ -86,7 +90,11 @@ begin
   from public.appointments
   where appointment_date = p_appointment_date
     and appointment_time = p_appointment_time
-    and status in ('pending', 'confirmed');
+    and status in ('pending', 'confirmed')
+    and (
+      google_calendar_event_id is not null
+      or created_at >= now() - interval '5 minutes'
+    );
 
   if active_count >= slot_capacity then
     raise exception using message = 'Este horario ya no tiene lugares disponibles.';
