@@ -26,10 +26,6 @@ begin
     return new;
   end if;
 
-  if extract(dow from new.appointment_date) = 6 and to_char(new.appointment_time, 'MI') <> '20' then
-    raise exception 'Los sabados solo se permiten horarios terminados en :20';
-  end if;
-
   slot_capacity := public.slot_capacity_for_appointment(new.appointment_date, new.appointment_time);
 
   select count(*) into active_count
@@ -82,10 +78,6 @@ begin
 
   if nullif(trim(p_whatsapp), '') is null then
     raise exception using message = 'Agrega WhatsApp para continuar.';
-  end if;
-
-  if extract(dow from p_appointment_date) = 6 and to_char(p_appointment_time, 'MI') <> '20' then
-    raise exception using message = 'Los sabados solo se permiten horarios terminados en :20.';
   end if;
 
   slot_capacity := public.slot_capacity_for_appointment(p_appointment_date, p_appointment_time);
