@@ -86,6 +86,18 @@ Para conectar Supabase:
 4. Completar las variables de Supabase en `.env.local`.
 5. Mantener Supabase como fuente principal de verdad para citas, contactos y administradores.
 
+### Login del panel
+
+Para que el login del panel regrese correctamente a `/panel`, Supabase Auth debe tener estas Redirect URLs permitidas:
+
+- `https://agenda-mas-sano.vercel.app/auth/callback`
+- `https://agenda-mas-sano-git-fase-4-contactos-mas-sano-s-projects.vercel.app/auth/callback`
+- Cualquier nueva URL de preview que Vercel genere para probar PRs, terminando en `/auth/callback`.
+
+Ruta en Supabase:
+
+Supabase -> Authentication -> URL Configuration -> Redirect URLs.
+
 ## Google Calendar
 
 Google Calendar se usa para bloquear el espacio desde que la cita queda en estado pendiente.
