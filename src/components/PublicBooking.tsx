@@ -49,10 +49,6 @@ const faqs = [
   {
     question: "¿Qué pasa si necesito cambiar mi cita?",
     answer: "Puedes escribirnos por WhatsApp para revisar disponibilidad."
-  },
-  {
-    question: "¿Cuánto dura la sesión?",
-    answer: "La sesión tiene una duración aproximada de 20 minutos."
   }
 ];
 
@@ -199,7 +195,7 @@ export function PublicBooking() {
         <section className="hero">
           <div className="hero-copy">
             <span className="price-pill">Sesión Integral $399</span>
-            <h2>Agenda tu Sesión Integral<br />en Más Sano</h2>
+            <h2>Agenda tu Sesión<br />en Más Sano</h2>
             <p className="lead">Ten una sesión con nutrióloga certificada y comienza con un plan adaptado a tu estilo de vida.</p>
             <div className="hero-actions">
               <a className="primary hero-cta" href="#agenda">Elegir horario</a>
