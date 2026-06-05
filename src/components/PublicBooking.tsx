@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
+import { CheckCircle2, Clock, MapPin, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
@@ -8,6 +8,9 @@ import type { AppointmentDraft } from "@/types/appointments";
 
 type Step = "date" | "time" | "details" | "done";
 type SlotCountRow = { appointment_time: string; active_count: number };
+
+const mapsUrl = "https://www.google.com/maps/place/Mas+Sano+NH+San+Nicol%C3%A1s/@25.7425456,-100.2845768,17z/data=!3m1!4b1!4m6!3m5!1s0x866294c1e4c304f1:0xafecff465cb237f0!8m2!3d25.7425408!4d-100.2820019!16s%2Fg%2F1z44bj20x?entry=ttu&g_ep=EgoyMDI2MDYwMS4wIKXMDSoASAFQAw%3D%3D";
+const locationAddress = "Av. Las Puentes 511, Col. Las Puentes 3er Sector";
 
 const emptyDraft: AppointmentDraft = {
   firstName: "",
@@ -201,6 +204,12 @@ export function PublicBooking() {
               <a className="primary hero-cta" href="#agenda">Elegir horario</a>
             </div>
 
+            <a className="location-chip" href={mapsUrl} target="_blank" rel="noopener noreferrer">
+              <MapPin size={18} />
+              <span><strong>Sucursal San Nicolás</strong><small>{locationAddress}</small></span>
+              <em>Ver mapa</em>
+            </a>
+
             <section className="info-block includes-block">
               <h3>Qué incluye tu sesión de $399</h3>
               <div className="info-grid">
@@ -309,8 +318,8 @@ export function PublicBooking() {
                   <CheckCircle2 size={42} />
                   <h2>Cita solicitada</h2>
                   <p className="copy">Recibimos tu solicitud. El equipo de Más Sano le dará seguimiento por WhatsApp.</p>
-                  <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div></div>
-                  <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a><button className="secondary" onClick={() => { setDraft(emptyDraft); setStep("date"); }} type="button">Nueva cita</button></div>
+                  <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div><div className="row"><span>Lugar</span><strong>{locationAddress}</strong></div></div>
+                  <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a><a className="secondary" href={mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin size={18} />Ver ubicación</a><button className="secondary" onClick={() => { setDraft(emptyDraft); setStep("date"); }} type="button">Nueva cita</button></div>
                 </section>
               )}
             </div>
