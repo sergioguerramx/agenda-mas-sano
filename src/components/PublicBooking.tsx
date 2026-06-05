@@ -17,6 +17,22 @@ const emptyDraft: AppointmentDraft = {
   time: ""
 };
 
+const consultationIncludes = [
+  "Sesion con nutriologa certificada",
+  "Plan de alimentacion personalizado",
+  "Auriculoterapia metabolica",
+  "Seguimiento por WhatsApp",
+  "Material de apoyo",
+  "Atencion en sucursal San Nicolas"
+];
+
+const howItWorks = [
+  "Elige dia y horario disponible",
+  "Deja tus datos",
+  "Tu cita queda agendada",
+  "Un dia antes te contactaremos por WhatsApp para confirmar"
+];
+
 export function PublicBooking() {
   const [step, setStep] = useState<Step>("date");
   const [draft, setDraft] = useState<AppointmentDraft>(emptyDraft);
@@ -24,6 +40,7 @@ export function PublicBooking() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [logoReady, setLogoReady] = useState(true);
   const dates = useMemo(() => buildAvailableDates(new Date()), []);
   const slots = useMemo(() => (draft.date ? buildSlotsForDate(draft.date, new Date(), reservedSlots) : []), [draft.date, reservedSlots]);
   const selectedDate = dates.find((date) => date.iso === draft.date);
@@ -138,7 +155,16 @@ export function PublicBooking() {
       <div className="shell">
         <header className="top">
           <div className="brand">
-            <div className="mark">MS</div>
+            {logoReady ? (
+              <img
+                alt="Mas Sano"
+                className="logo"
+                onError={() => setLogoReady(false)}
+                src="/logo-mas-sano.png"
+              />
+            ) : (
+              <div className="mark">MS</div>
+            )}
             <div>
               <p className="eyebrow">Nutricion Holistica</p>
               <h1 className="title">Mas Sano</h1>
@@ -148,13 +174,39 @@ export function PublicBooking() {
         </header>
 
         <section className="hero">
-          <div>
-            <h2>Agenda tu cita</h2>
-            <p>Elige fecha y horario disponible para tu visita. Te mostraremos espacios cercanos y confirmacion por WhatsApp.</p>
-            <p><span className="pill">15 dias adelante</span> <span className="pill">30 min de anticipacion</span></p>
+          <div className="hero-copy">
+            <span className="price-pill">Consulta Integral $399</span>
+            <h2>Agenda tu Consulta Integral en Mas Sano</h2>
+            <p className="lead">Ten una sesion con nutriologa certificada y comienza con un plan adaptado a tu estilo de vida.</p>
+            <div className="hero-actions">
+              <a className="primary" href="#agenda">Elegir horario</a>
+              <span className="pill">15 dias adelante</span>
+              <span className="pill">30 min de anticipacion</span>
+            </div>
+
+            <section className="info-block">
+              <h3>Que incluye tu consulta de $399</h3>
+              <div className="info-grid">
+                {consultationIncludes.map((item) => (
+                  <div className="mini-card" key={item}>
+                    <CheckCircle2 size={18} />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="info-block compact">
+              <h3>Como funciona</h3>
+              <ol className="steps-list">
+                {howItWorks.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
+            </section>
           </div>
 
-          <section className="card">
+          <section className="card booking-card" id="agenda">
             <div className="steps">
               {[
                 ["date", "Fecha"],
