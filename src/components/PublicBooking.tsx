@@ -186,7 +186,7 @@ export function PublicBooking() {
             )}
             <div>
               <p className="eyebrow">Más Sano Nutrición Holística</p>
-              <h1 className="title">Más Sano</h1>
+              <h1 className="title">#YoSoySano</h1>
             </div>
           </div>
           <span className="pill"><Clock size={16} />20 min</span>
