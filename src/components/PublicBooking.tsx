@@ -17,20 +17,43 @@ const emptyDraft: AppointmentDraft = {
   time: ""
 };
 
-const consultationIncludes = [
-  "Sesion con nutriologa certificada",
-  "Plan de alimentacion personalizado",
-  "Auriculoterapia metabolica",
+const sessionIncludes = [
+  "Sesión con nutrióloga certificada",
+  "Plan de alimentación personalizado",
+  "Auriculoterapia metabólica",
   "Seguimiento por WhatsApp",
   "Material de apoyo",
-  "Atencion en sucursal San Nicolas"
+  "Atención en sucursal San Nicolás"
 ];
 
 const howItWorks = [
-  "Elige dia y horario disponible",
+  "Elige día y horario disponible",
   "Deja tus datos",
   "Tu cita queda agendada",
-  "Un dia antes te contactaremos por WhatsApp para confirmar"
+  "Un día antes te contactaremos por WhatsApp para confirmar"
+];
+
+const faqs = [
+  {
+    question: "¿Qué incluye la sesión?",
+    answer: "Incluye sesión con nutrióloga certificada, plan de alimentación personalizado, auriculoterapia metabólica, seguimiento por WhatsApp y material de apoyo."
+  },
+  {
+    question: "¿Cómo confirmo mi cita?",
+    answer: "Un día antes te contactaremos por WhatsApp para confirmar tu asistencia."
+  },
+  {
+    question: "¿Dónde es la atención?",
+    answer: "En sucursal San Nicolás."
+  },
+  {
+    question: "¿Qué pasa si necesito cambiar mi cita?",
+    answer: "Puedes escribirnos por WhatsApp para revisar disponibilidad."
+  },
+  {
+    question: "¿Cuánto dura la sesión?",
+    answer: "La sesión tiene una duración aproximada de 20 minutos."
+  }
 ];
 
 export function PublicBooking() {
@@ -105,7 +128,7 @@ export function PublicBooking() {
     }
 
     if (!whatsapp) {
-      setError("Escribe un WhatsApp mexicano valido de 10 digitos.");
+      setError("Escribe un WhatsApp mexicano válido de 10 dígitos.");
       return;
     }
 
@@ -147,7 +170,7 @@ export function PublicBooking() {
 
   const waPhone = process.env.NEXT_PUBLIC_WHATSAPP_PHONE ?? "525512345678";
   const waText = encodeURIComponent(
-    `Hola, confirme mi cita en Mas Sano para ${selectedDate?.label ?? ""} a las ${selectedSlot?.label ?? ""}.`
+    `Hola, confirmé mi cita en Más Sano para ${selectedDate?.label ?? ""} a las ${selectedSlot?.label ?? ""}.`
   );
 
   return (
@@ -157,7 +180,7 @@ export function PublicBooking() {
           <div className="brand">
             {logoReady ? (
               <img
-                alt="Mas Sano"
+                alt="Más Sano"
                 className="logo"
                 onError={() => setLogoReady(false)}
                 src="/logo-mas-sano.png"
@@ -166,8 +189,8 @@ export function PublicBooking() {
               <div className="mark">MS</div>
             )}
             <div>
-              <p className="eyebrow">Nutricion Holistica</p>
-              <h1 className="title">Mas Sano</h1>
+              <p className="eyebrow">Más Sano Nutrición Holística</p>
+              <h1 className="title">Más Sano</h1>
             </div>
           </div>
           <span className="pill"><Clock size={16} />20 min</span>
@@ -175,19 +198,17 @@ export function PublicBooking() {
 
         <section className="hero">
           <div className="hero-copy">
-            <span className="price-pill">Consulta Integral $399</span>
-            <h2>Agenda tu Consulta Integral en Mas Sano</h2>
-            <p className="lead">Ten una sesion con nutriologa certificada y comienza con un plan adaptado a tu estilo de vida.</p>
+            <span className="price-pill">Sesión Integral $399</span>
+            <h2>Agenda tu Sesión Integral<br />en Más Sano</h2>
+            <p className="lead">Ten una sesión con nutrióloga certificada y comienza con un plan adaptado a tu estilo de vida.</p>
             <div className="hero-actions">
-              <a className="primary" href="#agenda">Elegir horario</a>
-              <span className="pill">15 dias adelante</span>
-              <span className="pill">30 min de anticipacion</span>
+              <a className="primary hero-cta" href="#agenda">Elegir horario</a>
             </div>
 
-            <section className="info-block">
-              <h3>Que incluye tu consulta de $399</h3>
+            <section className="info-block includes-block">
+              <h3>Qué incluye tu sesión de $399</h3>
               <div className="info-grid">
-                {consultationIncludes.map((item) => (
+                {sessionIncludes.map((item) => (
                   <div className="mini-card" key={item}>
                     <CheckCircle2 size={18} />
                     <span>{item}</span>
@@ -197,7 +218,7 @@ export function PublicBooking() {
             </section>
 
             <section className="info-block compact">
-              <h3>Como funciona</h3>
+              <h3>Cómo funciona</h3>
               <ol className="steps-list">
                 {howItWorks.map((item) => (
                   <li key={item}>{item}</li>
@@ -222,7 +243,7 @@ export function PublicBooking() {
               {step === "date" && (
                 <section>
                   <h3>Selecciona fecha</h3>
-                  <p className="copy">Miercoles y domingo permanecen cerrados.</p>
+                  <p className="copy">Miércoles y domingo permanecen cerrados.</p>
                   <div className="grid">
                     {dates.map((date) => (
                       <button
@@ -291,13 +312,28 @@ export function PublicBooking() {
                 <section className="success">
                   <CheckCircle2 size={42} />
                   <h2>Cita solicitada</h2>
-                  <p className="copy">Recibimos tu solicitud. El equipo de Mas Sano le dara seguimiento por WhatsApp.</p>
+                  <p className="copy">Recibimos tu solicitud. El equipo de Más Sano le dará seguimiento por WhatsApp.</p>
                   <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div></div>
                   <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a><button className="secondary" onClick={() => { setDraft(emptyDraft); setStep("date"); }} type="button">Nueva cita</button></div>
                 </section>
               )}
             </div>
           </section>
+        </section>
+
+        <section className="faq-section" aria-label="Preguntas frecuentes">
+          <div>
+            <p className="eyebrow">Información útil</p>
+            <h2>Preguntas frecuentes</h2>
+          </div>
+          <div className="faq-list">
+            {faqs.map((faq) => (
+              <details className="faq-item" key={faq.question}>
+                <summary>{faq.question}</summary>
+                <p>{faq.answer}</p>
+              </details>
+            ))}
+          </div>
         </section>
       </div>
     </main>
