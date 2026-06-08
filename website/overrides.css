@@ -1,0 +1,67 @@
+.msnh-hero-valeria {
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid rgba(41, 72, 58, 0.1);
+  border-radius: clamp(24px, 5vw, 44px);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(248, 220, 199, 0.78), rgba(255, 253, 248, 0.92) 48%, rgba(205, 223, 203, 0.72));
+  background-size: 25% 100%, 100% 100%;
+  box-shadow: var(--msnh-shadow);
+}
+
+.msnh-hero-valeria::after {
+  content: "";
+  position: absolute;
+  right: 9%;
+  bottom: 0;
+  left: 9%;
+  height: 1px;
+  background: rgba(41, 72, 58, 0.14);
+}
+
+.msnh-hero-valeria img {
+  width: 100%;
+  height: 100%;
+  min-height: 440px;
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  aspect-ratio: auto;
+  object-fit: contain;
+  object-position: center bottom;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.msnh-valeria-photo {
+  min-height: 340px;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--msnh-radius);
+  background: var(--msnh-warm);
+  box-shadow: var(--msnh-shadow);
+}
+
+.msnh-valeria-photo img {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+@media (min-width: 820px) {
+  .msnh-hero-valeria {
+    min-height: 610px;
+  }
+
+  .msnh-hero-valeria img {
+    min-height: 610px;
+  }
+
+  .msnh-valeria-photo {
+    min-height: 440px;
+  }
+}
