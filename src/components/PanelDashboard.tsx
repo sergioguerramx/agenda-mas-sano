@@ -14,8 +14,9 @@ const labels: Record<AppointmentStatus, string> = {
   completed: "completada"
 };
 
-const PRODUCTION_SITE_URL = "https://agenda-mas-sano.vercel.app";
+const PRODUCTION_SITE_URL = "https://agenda.massanonh.com";
 const PANEL_REQUEST_TIMEOUT_MS = 12000;
+const TIME_ZONE = "America/Monterrey";
 type PanelView = "appointments" | "contacts";
 
 function getPanelRedirectUrl() {
@@ -30,6 +31,34 @@ function getPanelRedirectUrl() {
   return `${safeSiteUrl}/auth/panel-callback`;
 }
 
+function getRegistrationDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function getRegistrationLabel(value?: string) {
+  if (!value) return "Sin fecha de registro";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin fecha de registro";
+
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 function toAppointment(row: AppointmentRow): Appointment {
   return {
     id: row.id,
@@ -38,7 +67,8 @@ function toAppointment(row: AppointmentRow): Appointment {
     whatsapp: row.whatsapp,
     date: row.appointment_date,
     time: row.appointment_time.slice(0, 5),
-    status: row.status
+    status: row.status,
+    createdAt: row.created_at
   };
 }
 
@@ -66,7 +96,6 @@ function escapeCsvValue(value: string | number) {
 
 function exportCsv(filename: string, rows: Array<Record<string, string | number>>) {
   if (rows.length === 0) return;
-
   const firstRow = rows[0];
   if (!firstRow) return;
 
@@ -114,7 +143,7 @@ function openWhatsApp(whatsapp: string) {
 function formatHistory(history: Appointment[]) {
   return history
     .slice(0, 4)
-    .map((item) => `${item.date} ${item.time} ${labels[item.status]}`)
+    .map((item) => `Cita para ${item.date} ${item.time}: ${labels[item.status]}`)
     .join(" | ");
 }
 
@@ -139,6 +168,7 @@ export function PanelDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState("");
+  const [registrationDate, setRegistrationDate] = useState("");
   const [view, setView] = useState<PanelView>("appointments");
   const [items, setItems] = useState<Appointment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -165,8 +195,17 @@ export function PanelDashboard() {
   }, [contacts]);
 
   const filtered = useMemo(
-    () => items.filter((item) => !date || item.date === date),
-    [items, date]
+    () => items.filter((item) => {
+      const matchesAppointmentDate = !date || item.date === date;
+      const matchesRegistrationDate = !registrationDate || getRegistrationDate(item.createdAt) === registrationDate;
+      return matchesAppointmentDate && matchesRegistrationDate;
+    }),
+    [items, date, registrationDate]
+  );
+
+  const registeredTodayCount = useMemo(
+    () => (registrationDate ? filtered.length : 0),
+    [filtered.length, registrationDate]
   );
 
   const filteredContacts = useMemo(() => {
@@ -183,7 +222,8 @@ export function PanelDashboard() {
     const { data, error } = await withPanelTimeout(
       client
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, created_at")
+        .order("created_at", { ascending: false })
         .order("appointment_date", { ascending: true })
         .order("appointment_time", { ascending: true }),
       "No se pudieron cargar las citas. Intenta refrescar el panel."
@@ -230,7 +270,6 @@ export function PanelDashboard() {
     async function applySession(currentSession: Session | null) {
       const email = currentSession?.user.email ?? "";
       const allowed = currentSession ? await checkAdminAccess(client, email) : false;
-
       if (!isActive) return;
 
       setSession(currentSession);
@@ -258,13 +297,10 @@ export function PanelDashboard() {
           client.auth.getSession(),
           "No se pudo validar la sesion. Intenta entrar de nuevo."
         );
-
         if (error) throw error;
-
         await applySession(data.session);
       } catch (error) {
         if (!isActive) return;
-
         setSession(null);
         setIsAdmin(false);
         setItems([]);
@@ -293,7 +329,6 @@ export function PanelDashboard() {
 
   async function login() {
     if (!supabase) return;
-
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: getPanelRedirectUrl() }
@@ -327,13 +362,7 @@ export function PanelDashboard() {
   }
 
   if (loading) {
-    return (
-      <main className="page">
-        <div className="shell">
-          <section className="card panel-card"><p className="copy">Cargando panel...</p></section>
-        </div>
-      </main>
-    );
+    return <main className="page"><div className="shell"><section className="card panel-card"><p className="copy">Cargando panel...</p></section></div></main>;
   }
 
   if (!session || !isAdmin) {
@@ -365,8 +394,10 @@ export function PanelDashboard() {
           {view === "appointments" && (
             <>
               <div className="filters">
-                <div className="field"><label htmlFor="dateFilter">Fecha</label><input id="dateFilter" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+                <div className="field"><label htmlFor="dateFilter">Fecha de la cita</label><input id="dateFilter" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+                <div className="field"><label htmlFor="registrationDateFilter">Agendadas el dia</label><input id="registrationDateFilter" type="date" value={registrationDate} onChange={(event) => setRegistrationDate(event.target.value)} /></div>
               </div>
+              {registrationDate && <p className="copy">Citas registradas el {registrationDate}: <strong>{registeredTodayCount}</strong></p>}
               <div className="list">
                 {filtered.map((item) => {
                   const contact = contactByWhatsapp.get(item.whatsapp);
@@ -376,11 +407,12 @@ export function PanelDashboard() {
                   return (
                     <article className="apt" key={item.id}>
                       <div>
-                        <strong>{item.date} - {item.time}</strong>
+                        <strong>Cita para: {item.date} - {item.time}</strong>
                         <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
+                        <p className="copy">Agendada el: {getRegistrationLabel(item.createdAt)}</p>
                         <p className="copy">WhatsApp: {item.whatsapp}</p>
                         <p className="copy">Total de citas: {totalAppointments} - Ultima cita: {lastAppointmentDate}</p>
-                        {history.length > 0 && <p className="copy">Historial: {formatHistory(history)}</p>}
+                        {history.length > 0 && <p className="copy">Historial de citas: {formatHistory(history)}</p>}
                       </div>
                       <div className="actions">
                         <button className="primary" onClick={() => openWhatsApp(item.whatsapp)} type="button"><MessageCircle size={17} />Abrir WhatsApp</button>
@@ -411,7 +443,7 @@ export function PanelDashboard() {
                         <p className="copy">{contact.branch} - {contact.source}</p>
                         <p className="copy">Total de citas: {contact.totalAppointments} - Ultima cita: {contact.lastAppointmentDate}</p>
                         <p className="copy">Primera cita: {contact.firstAppointmentDate}</p>
-                        {history.length > 0 && <p className="copy">Historial: {formatHistory(history)}</p>}
+                        {history.length > 0 && <p className="copy">Historial de citas: {formatHistory(history)}</p>}
                       </div>
                       <div className="actions">
                         <button className="primary" onClick={() => openWhatsApp(contact.whatsapp)} type="button"><MessageCircle size={17} />Abrir WhatsApp</button>
