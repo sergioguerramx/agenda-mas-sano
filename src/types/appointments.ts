@@ -11,6 +11,7 @@ export type AppointmentDraft = {
 export type Appointment = AppointmentDraft & {
   id: string;
   status: AppointmentStatus;
+  createdAt?: string;
 };
 
 export type AppointmentRow = {
