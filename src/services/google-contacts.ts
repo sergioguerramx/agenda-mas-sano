@@ -13,7 +13,8 @@ type GooglePerson = {
   metadata?: {
     sources?: Array<{ type?: string; etag?: string; id?: string }>;
   };
-  names?: Array<{ givenName?: string; familyName?: string }>;
+  names?: Array<{ givenName?: string; familyName?: string; displayName?: string }>;
+  emailAddresses?: Array<{ value?: string }>;
   phoneNumbers?: Array<{ value?: string; type?: string }>;
   memberships?: Array<{ contactGroupMembership?: { contactGroupResourceName?: string } }>;
   userDefined?: Array<{ key?: string; value?: string }>;
@@ -24,14 +25,30 @@ type GooglePeopleResponse = {
   error?: { message?: string; code?: number; status?: string; details?: unknown[] };
 };
 
+type GoogleTokenInfoResponse = {
+  email?: string;
+  scope?: string;
+  error?: string;
+  error_description?: string;
+};
+
 type GoogleContactResult = {
   status: "created" | "updated" | "skipped";
   resourceName?: string;
   reason?: string;
 };
 
+type GoogleContactsAccountResult = {
+  configured: boolean;
+  connected: boolean;
+  email?: string;
+  name?: string;
+  reason?: string;
+};
+
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_PEOPLE_BASE_URL = "https://people.googleapis.com/v1";
+const GOOGLE_TOKEN_INFO_URL = "https://www.googleapis.com/oauth2/v1/tokeninfo";
 const GOOGLE_CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts";
 
 let tokenCache: { accessToken: string; expiresAt: number } | null = null;
@@ -156,6 +173,11 @@ async function callPeopleApi(path: string, init: RequestInit = {}) {
   return body;
 }
 
+async function getGoogleTokenInfo(accessToken: string) {
+  const response = await fetch(`${GOOGLE_TOKEN_INFO_URL}?access_token=${encodeURIComponent(accessToken)}`);
+  return (await response.json().catch(() => ({}))) as GoogleTokenInfoResponse;
+}
+
 function buildContactPerson(appointment: AppointmentRow, existing?: GooglePerson): GooglePerson {
   const config = getContactsConfig();
   const groupResourceName = getGroupResourceName(config.groupId);
@@ -200,6 +222,35 @@ async function searchGoogleContactByPhone(whatsapp: string) {
   return body.results
     ?.map((result) => result.person)
     .find((person) => person?.phoneNumbers?.some((phone) => normalizePhone(phone.value ?? "") === targetPhone)) ?? null;
+}
+
+export async function getGoogleContactsAccountInfo(): Promise<GoogleContactsAccountResult> {
+  if (!isGoogleContactsConfigured()) {
+    return { configured: false, connected: false, reason: "Google Contacts no esta configurado." };
+  }
+
+  const accessToken = await getGoogleContactsAccessToken();
+
+  try {
+    const person = await callPeopleApi("/people/me?personFields=names,emailAddresses") as GooglePerson;
+    const email = person.emailAddresses?.find((item) => item.value)?.value;
+    const name = person.names?.find((item) => item.displayName)?.displayName;
+
+    if (email || name) {
+      return { configured: true, connected: true, email, name };
+    }
+  } catch (error) {
+    console.warn("Google Contacts account profile warning", { error: safeJson(error) });
+  }
+
+  const tokenInfo = await getGoogleTokenInfo(accessToken);
+
+  return {
+    configured: true,
+    connected: true,
+    email: tokenInfo.email,
+    reason: tokenInfo.email ? undefined : "Google no devolvio el correo con los permisos actuales."
+  };
 }
 
 export async function upsertGoogleContact(appointment: AppointmentRow): Promise<GoogleContactResult> {
