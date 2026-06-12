@@ -12,6 +12,7 @@ export type Appointment = AppointmentDraft & {
   id: string;
   status: AppointmentStatus;
   createdAt?: string;
+  googleContactId?: string | null;
 };
 
 export type AppointmentRow = {
@@ -41,6 +42,7 @@ export type ContactRow = {
   total_appointments: number;
   latest_status: AppointmentStatus;
   latest_appointment_id?: string | null;
+  google_contact_resource_name?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -57,4 +59,5 @@ export type Contact = {
   totalAppointments: number;
   latestStatus: AppointmentStatus;
   latestAppointmentId?: string | null;
+  googleContactId?: string | null;
 };
