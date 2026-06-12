@@ -68,7 +68,8 @@ function toAppointment(row: AppointmentRow): Appointment {
     date: row.appointment_date,
     time: row.appointment_time.slice(0, 5),
     status: row.status,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    googleContactId: row.google_contact_id
   };
 }
 
@@ -84,7 +85,8 @@ function toContact(row: ContactRow): Contact {
     lastAppointmentDate: row.last_appointment_date,
     totalAppointments: row.total_appointments,
     latestStatus: row.latest_status,
-    latestAppointmentId: row.latest_appointment_id
+    latestAppointmentId: row.latest_appointment_id,
+    googleContactId: row.google_contact_resource_name
   };
 }
 
@@ -129,6 +131,10 @@ function withPanelTimeout<T>(promise: PromiseLike<T>, message: string) {
 
 function formatContactName(firstName: string, lastName: string) {
   return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim();
+}
+
+function getGoogleContactsLabel(value?: string | null) {
+  return value ? "Registrado en Google Contacts" : "Pendiente en Google Contacts";
 }
 
 function getWhatsAppUrl(whatsapp: string) {
@@ -222,7 +228,7 @@ export function PanelDashboard() {
     const { data, error } = await withPanelTimeout(
       client
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, created_at")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_contact_id, created_at")
         .order("created_at", { ascending: false })
         .order("appointment_date", { ascending: true })
         .order("appointment_time", { ascending: true }),
@@ -241,7 +247,7 @@ export function PanelDashboard() {
     const { data, error } = await withPanelTimeout(
       client
         .from("contacts")
-        .select("id, first_name, last_name, whatsapp, source, branch, first_appointment_date, last_appointment_date, total_appointments, latest_status, latest_appointment_id, created_at, updated_at")
+        .select("id, first_name, last_name, whatsapp, source, branch, first_appointment_date, last_appointment_date, total_appointments, latest_status, latest_appointment_id, google_contact_resource_name, created_at, updated_at")
         .order("last_appointment_date", { ascending: false })
         .order("updated_at", { ascending: false }),
       "No se pudieron cargar los contactos. Intenta refrescar el panel."
@@ -356,7 +362,8 @@ export function PanelDashboard() {
         "Primera cita": contact.firstAppointmentDate,
         "Ultima cita": contact.lastAppointmentDate,
         "Total citas": contact.totalAppointments,
-        "Estado reciente": labels[contact.latestStatus]
+        "Estado reciente": labels[contact.latestStatus],
+        "Google Contacts": getGoogleContactsLabel(contact.googleContactId)
       }))
     );
   }
@@ -404,6 +411,7 @@ export function PanelDashboard() {
                   const history = appointmentHistoryByWhatsapp.get(item.whatsapp) ?? [];
                   const totalAppointments = contact?.totalAppointments ?? history.length;
                   const lastAppointmentDate = contact?.lastAppointmentDate ?? item.date;
+                  const googleContactId = item.googleContactId ?? contact?.googleContactId;
                   return (
                     <article className="apt" key={item.id}>
                       <div>
@@ -411,6 +419,7 @@ export function PanelDashboard() {
                         <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
                         <p className="copy">Agendada el: {getRegistrationLabel(item.createdAt)}</p>
                         <p className="copy">WhatsApp: {item.whatsapp}</p>
+                        <p className="copy">Google Contacts: {getGoogleContactsLabel(googleContactId)}</p>
                         <p className="copy">Total de citas: {totalAppointments} - Ultima cita: {lastAppointmentDate}</p>
                         {history.length > 0 && <p className="copy">Historial de citas: {formatHistory(history)}</p>}
                       </div>
@@ -441,6 +450,7 @@ export function PanelDashboard() {
                         <strong>{formatContactName(contact.firstName, contact.lastName)}</strong>
                         <p className="copy">WhatsApp: {contact.whatsapp}</p>
                         <p className="copy">{contact.branch} - {contact.source}</p>
+                        <p className="copy">Google Contacts: {getGoogleContactsLabel(contact.googleContactId)}</p>
                         <p className="copy">Total de citas: {contact.totalAppointments} - Ultima cita: {contact.lastAppointmentDate}</p>
                         <p className="copy">Primera cita: {contact.firstAppointmentDate}</p>
                         {history.length > 0 && <p className="copy">Historial de citas: {formatHistory(history)}</p>}
