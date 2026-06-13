@@ -456,14 +456,32 @@ export function PanelDashboard() {
           {message && <p className="error">{message}</p>}
           {view === "appointments" && (
             <>
-              <div className="filters">
-                <div className="field"><label htmlFor="appointmentDateFrom">Cita desde</label><input id="appointmentDateFrom" type="date" value={appointmentDateFrom} onChange={(event) => setAppointmentDateFrom(event.target.value)} /></div>
-                <div className="field"><label htmlFor="appointmentDateTo">Cita hasta</label><input id="appointmentDateTo" type="date" value={appointmentDateTo} onChange={(event) => setAppointmentDateTo(event.target.value)} /></div>
-                <div className="field"><label htmlFor="registrationDateFrom">Agendada desde</label><input id="registrationDateFrom" type="date" value={registrationDateFrom} onChange={(event) => setRegistrationDateFrom(event.target.value)} /></div>
-                <div className="field"><label htmlFor="registrationDateTo">Agendada hasta</label><input id="registrationDateTo" type="date" value={registrationDateTo} onChange={(event) => setRegistrationDateTo(event.target.value)} /></div>
+              <div className="list">
+                <article className="apt">
+                  <div>
+                    <strong>Fecha de la cita</strong>
+                    <p className="copy">Usa este filtro para revisar que citas estan programadas para asistir entre estas fechas.</p>
+                    <div className="filters">
+                      <div className="field"><label htmlFor="appointmentDateFrom">Desde</label><input id="appointmentDateFrom" type="date" value={appointmentDateFrom} onChange={(event) => setAppointmentDateFrom(event.target.value)} /></div>
+                      <div className="field"><label htmlFor="appointmentDateTo">Hasta</label><input id="appointmentDateTo" type="date" value={appointmentDateTo} onChange={(event) => setAppointmentDateTo(event.target.value)} /></div>
+                    </div>
+                  </div>
+                </article>
+                <article className="apt">
+                  <div>
+                    <strong>Fecha en que se agendo</strong>
+                    <p className="copy">Usa este filtro para medir cuantas citas se registraron en un periodo. Es el mas util para reportes de publicidad.</p>
+                    <div className="filters">
+                      <div className="field"><label htmlFor="registrationDateFrom">Desde</label><input id="registrationDateFrom" type="date" value={registrationDateFrom} onChange={(event) => setRegistrationDateFrom(event.target.value)} /></div>
+                      <div className="field"><label htmlFor="registrationDateTo">Hasta</label><input id="registrationDateTo" type="date" value={registrationDateTo} onChange={(event) => setRegistrationDateTo(event.target.value)} /></div>
+                    </div>
+                  </div>
+                </article>
               </div>
               <p className="copy">
-                Reporte: <strong>{appointmentReportSummary.total}</strong> citas. Fecha de cita: {appointmentReportSummary.appointmentPeriod}. Agendadas: {appointmentReportSummary.registrationPeriod}.
+                <strong>Resultado:</strong> {appointmentReportSummary.total} citas encontradas.
+                {" "}Fecha de cita: {appointmentReportSummary.appointmentPeriod}.
+                {" "}Fecha en que se agendo: {appointmentReportSummary.registrationPeriod}.
               </p>
               <div className="actions">
                 <button className="secondary" onClick={exportAppointments} type="button"><Download size={17} />Descargar reporte de citas</button>
