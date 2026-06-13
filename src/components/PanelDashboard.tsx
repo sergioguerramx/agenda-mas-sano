@@ -59,6 +59,20 @@ function getRegistrationLabel(value?: string) {
   }).format(date);
 }
 
+function isDateInRange(value: string, from: string, to: string) {
+  if (!value) return false;
+  if (from && value < from) return false;
+  if (to && value > to) return false;
+  return true;
+}
+
+function getPeriodLabel(from: string, to: string) {
+  if (from && to) return `${from} a ${to}`;
+  if (from) return `desde ${from}`;
+  if (to) return `hasta ${to}`;
+  return "todos los registros";
+}
+
 function toAppointment(row: AppointmentRow): Appointment {
   return {
     id: row.id,
@@ -102,10 +116,10 @@ function exportCsv(filename: string, rows: Array<Record<string, string | number>
   if (!firstRow) return;
 
   const headers = Object.keys(firstRow);
-  const csv = [
+  const csv = `\uFEFF${[
     headers.join(","),
     ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header] ?? "")).join(","))
-  ].join("\n");
+  ].join("\n")}`;
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -173,8 +187,10 @@ export function PanelDashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState("");
-  const [registrationDate, setRegistrationDate] = useState("");
+  const [appointmentDateFrom, setAppointmentDateFrom] = useState("");
+  const [appointmentDateTo, setAppointmentDateTo] = useState("");
+  const [registrationDateFrom, setRegistrationDateFrom] = useState("");
+  const [registrationDateTo, setRegistrationDateTo] = useState("");
   const [view, setView] = useState<PanelView>("appointments");
   const [items, setItems] = useState<Appointment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -202,16 +218,21 @@ export function PanelDashboard() {
 
   const filtered = useMemo(
     () => items.filter((item) => {
-      const matchesAppointmentDate = !date || item.date === date;
-      const matchesRegistrationDate = !registrationDate || getRegistrationDate(item.createdAt) === registrationDate;
+      const registrationDate = getRegistrationDate(item.createdAt);
+      const matchesAppointmentDate = isDateInRange(item.date, appointmentDateFrom, appointmentDateTo);
+      const matchesRegistrationDate = isDateInRange(registrationDate, registrationDateFrom, registrationDateTo);
       return matchesAppointmentDate && matchesRegistrationDate;
     }),
-    [items, date, registrationDate]
+    [items, appointmentDateFrom, appointmentDateTo, registrationDateFrom, registrationDateTo]
   );
 
-  const registeredTodayCount = useMemo(
-    () => (registrationDate ? filtered.length : 0),
-    [filtered.length, registrationDate]
+  const appointmentReportSummary = useMemo(
+    () => ({
+      total: filtered.length,
+      appointmentPeriod: getPeriodLabel(appointmentDateFrom, appointmentDateTo),
+      registrationPeriod: getPeriodLabel(registrationDateFrom, registrationDateTo)
+    }),
+    [filtered.length, appointmentDateFrom, appointmentDateTo, registrationDateFrom, registrationDateTo]
   );
 
   const filteredContacts = useMemo(() => {
@@ -368,6 +389,41 @@ export function PanelDashboard() {
     );
   }
 
+  function clearAppointmentFilters() {
+    setAppointmentDateFrom("");
+    setAppointmentDateTo("");
+    setRegistrationDateFrom("");
+    setRegistrationDateTo("");
+  }
+
+  function exportAppointments() {
+    const from = registrationDateFrom || appointmentDateFrom || "inicio";
+    const to = registrationDateTo || appointmentDateTo || "fin";
+
+    exportCsv(
+      `reporte-citas-mas-sano-${from}-a-${to}.csv`,
+      filtered.map((item) => {
+        const contact = contactByWhatsapp.get(item.whatsapp);
+        const history = appointmentHistoryByWhatsapp.get(item.whatsapp) ?? [];
+        const googleContactId = item.googleContactId ?? contact?.googleContactId;
+
+        return {
+          "Agendada el": getRegistrationLabel(item.createdAt),
+          "Fecha agendada": getRegistrationDate(item.createdAt),
+          "Fecha de cita": item.date,
+          "Hora de cita": item.time,
+          Nombre: item.firstName,
+          Apellidos: item.lastName,
+          WhatsApp: item.whatsapp,
+          Estado: labels[item.status],
+          "Total de citas del contacto": contact?.totalAppointments ?? history.length,
+          "Ultima cita del contacto": contact?.lastAppointmentDate ?? item.date,
+          "Google Contacts": getGoogleContactsLabel(googleContactId)
+        };
+      })
+    );
+  }
+
   if (loading) {
     return <main className="page"><div className="shell"><section className="card panel-card"><p className="copy">Cargando panel...</p></section></div></main>;
   }
@@ -401,10 +457,18 @@ export function PanelDashboard() {
           {view === "appointments" && (
             <>
               <div className="filters">
-                <div className="field"><label htmlFor="dateFilter">Fecha de la cita</label><input id="dateFilter" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
-                <div className="field"><label htmlFor="registrationDateFilter">Agendadas el dia</label><input id="registrationDateFilter" type="date" value={registrationDate} onChange={(event) => setRegistrationDate(event.target.value)} /></div>
+                <div className="field"><label htmlFor="appointmentDateFrom">Cita desde</label><input id="appointmentDateFrom" type="date" value={appointmentDateFrom} onChange={(event) => setAppointmentDateFrom(event.target.value)} /></div>
+                <div className="field"><label htmlFor="appointmentDateTo">Cita hasta</label><input id="appointmentDateTo" type="date" value={appointmentDateTo} onChange={(event) => setAppointmentDateTo(event.target.value)} /></div>
+                <div className="field"><label htmlFor="registrationDateFrom">Agendada desde</label><input id="registrationDateFrom" type="date" value={registrationDateFrom} onChange={(event) => setRegistrationDateFrom(event.target.value)} /></div>
+                <div className="field"><label htmlFor="registrationDateTo">Agendada hasta</label><input id="registrationDateTo" type="date" value={registrationDateTo} onChange={(event) => setRegistrationDateTo(event.target.value)} /></div>
               </div>
-              {registrationDate && <p className="copy">Citas registradas el {registrationDate}: <strong>{registeredTodayCount}</strong></p>}
+              <p className="copy">
+                Reporte: <strong>{appointmentReportSummary.total}</strong> citas. Fecha de cita: {appointmentReportSummary.appointmentPeriod}. Agendadas: {appointmentReportSummary.registrationPeriod}.
+              </p>
+              <div className="actions">
+                <button className="secondary" onClick={exportAppointments} type="button"><Download size={17} />Descargar reporte de citas</button>
+                <button className="secondary" onClick={clearAppointmentFilters} type="button">Limpiar filtros</button>
+              </div>
               <div className="list">
                 {filtered.map((item) => {
                   const contact = contactByWhatsapp.get(item.whatsapp);
