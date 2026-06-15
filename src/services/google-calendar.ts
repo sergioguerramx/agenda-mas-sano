@@ -19,6 +19,8 @@ type GoogleCalendarEventResponse = {
 type GoogleCalendarEvent = {
   id?: string;
   status?: string;
+  summary?: string;
+  description?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
 };
@@ -52,6 +54,7 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const DEFAULT_TIME_ZONE = "America/Monterrey";
 const DEFAULT_DURATION_MINUTES = 20;
+const NON_APPOINTMENT_CALENDAR_KEYWORDS = ["COMIDA", "DESCANSO"];
 
 class GoogleCalendarApiError extends Error {
   status: number;
@@ -296,6 +299,18 @@ function getEventWindowForDate(event: GoogleCalendarEvent, date: string, timeZon
   return { start: startMinutes, end: endMinutes };
 }
 
+function getNormalizedEventText(event: GoogleCalendarEvent) {
+  return `${event.summary ?? ""} ${event.description ?? ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function isNonAppointmentCalendarBlock(event: GoogleCalendarEvent) {
+  const text = getNormalizedEventText(event);
+  return NON_APPOINTMENT_CALENDAR_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
 async function listGoogleCalendarEvents(date: string) {
   if (!isGoogleCalendarConfigured()) {
     throw new Error("Google Calendar no esta configurado.");
@@ -317,7 +332,7 @@ async function listGoogleCalendarEvents(date: string) {
     timeMax,
     timeZone: config.timeZone
   }) as GoogleCalendarEventsResponse;
-  return (body.items ?? []).filter((event) => event.status !== "cancelled");
+  return (body.items ?? []).filter((event) => event.status !== "cancelled" && !isNonAppointmentCalendarBlock(event));
 }
 
 export async function getGoogleCalendarSlotCounts(date: string, slotTimes: string[]): Promise<CalendarSlotCount[]> {
