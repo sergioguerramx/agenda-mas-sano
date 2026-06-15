@@ -96,6 +96,54 @@ async function getSlotDiagnostics(payload: RequestPayload) {
   }
 }
 
+async function getExistingAppointment(payload: RequestPayload, normalizedTime: string) {
+  try {
+    if (!payload.date || !payload.whatsapp) return null;
+
+    const adminSupabase = createSupabaseServiceRoleClient();
+    const { data, error } = await adminSupabase
+      .from("appointments")
+      .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, created_at, updated_at")
+      .eq("appointment_date", payload.date)
+      .eq("appointment_time", normalizedTime)
+      .eq("whatsapp", payload.whatsapp)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      logAutomationWarning("Existing appointment lookup warning", error, {
+        payload: {
+          date: payload.date,
+          time: normalizedTime,
+          whatsapp: payload.whatsapp
+        }
+      });
+      return null;
+    }
+
+    return data as AppointmentRow | null;
+  } catch (error) {
+    logAutomationWarning("Existing appointment lookup failed", error, {
+      payload: {
+        date: payload.date,
+        time: normalizedTime,
+        whatsapp: payload.whatsapp
+      }
+    });
+    return null;
+  }
+}
+
+function alreadyCreatedResponse(appointment: AppointmentRow) {
+  return NextResponse.json({
+    success: true,
+    appointment_id: appointment.id,
+    alreadyCreated: true
+  });
+}
+
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Falta conectar Supabase." }, { status: 500 });
@@ -132,9 +180,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const existingAppointment = await getExistingAppointment(payload, normalizedTime);
+    if (existingAppointment) {
+      console.info("Appointment already exists for retry", {
+        appointmentId: existingAppointment.id,
+        payload: {
+          date: payload.date,
+          time: normalizedTime,
+          whatsapp: payload.whatsapp
+        }
+      });
+      return alreadyCreatedResponse(existingAppointment);
+    }
+
     const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(payload.date, payload.time);
 
     if (!calendarSlotAvailable) {
+      const appointmentAfterCalendarCheck = await getExistingAppointment(payload, normalizedTime);
+      if (appointmentAfterCalendarCheck) {
+        console.info("Appointment already exists after Calendar availability rejection", {
+          appointmentId: appointmentAfterCalendarCheck.id,
+          payload: {
+            date: payload.date,
+            time: normalizedTime,
+            whatsapp: payload.whatsapp
+          }
+        });
+        return alreadyCreatedResponse(appointmentAfterCalendarCheck);
+      }
+
       console.warn("Appointment rejected by Google Calendar availability", {
         payload: {
           date: payload.date,
@@ -379,6 +453,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, automationStatus });
   } catch (error) {
     if (isSlotCapacityError(error)) {
+      const normalizedTime = payload.time?.slice(0, 5) ?? "";
+      const existingAppointment = await getExistingAppointment(payload, normalizedTime);
+      if (existingAppointment) {
+        console.info("Appointment already exists after capacity rejection", {
+          appointmentId: existingAppointment.id,
+          payload: {
+            date: payload.date,
+            time: normalizedTime,
+            whatsapp: payload.whatsapp
+          }
+        });
+        return alreadyCreatedResponse(existingAppointment);
+      }
+
       const diagnostics = await getSlotDiagnostics(payload);
 
       logAutomationWarning("Appointment rejected by Supabase capacity after Calendar availability passed", error, {
