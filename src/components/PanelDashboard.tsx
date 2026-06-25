@@ -83,7 +83,14 @@ function toAppointment(row: AppointmentRow): Appointment {
     time: row.appointment_time.slice(0, 5),
     status: row.status,
     createdAt: row.created_at,
-    googleContactId: row.google_contact_id
+    googleContactId: row.google_contact_id,
+    brand: row.brand,
+    modality: row.modality,
+    service: row.service,
+    origin: row.origin,
+    registroId: row.registro_id,
+    clienteId: row.cliente_id,
+    correo: row.correo
   };
 }
 
@@ -149,6 +156,17 @@ function formatContactName(firstName: string, lastName: string) {
 
 function getGoogleContactsLabel(value?: string | null) {
   return value ? "Registrado en Google Contacts" : "Pendiente en Google Contacts";
+}
+
+function getAppointmentTypeLabel(item: Appointment) {
+  if (item.brand === "yo_soy_sano" || item.origin === "yosoysano") return "Yo Soy Sano Online";
+  return "Más Sano Presencial";
+}
+
+function getServiceLabel(item: Appointment) {
+  if (item.service === "paquete_1199") return "Paquete 4 sesiones";
+  if (item.service === "sesion_online_399") return "Sesión Online $399";
+  return "Sesión Integral $399";
 }
 
 function getWhatsAppUrl(whatsapp: string) {
@@ -249,7 +267,7 @@ export function PanelDashboard() {
     const { data, error } = await withPanelTimeout(
       client
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_contact_id, created_at")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_contact_id, brand, modality, service, origin, registro_id, cliente_id, correo, created_at")
         .order("created_at", { ascending: false })
         .order("appointment_date", { ascending: true })
         .order("appointment_time", { ascending: true }),
@@ -415,6 +433,9 @@ export function PanelDashboard() {
           Nombre: item.firstName,
           Apellidos: item.lastName,
           WhatsApp: item.whatsapp,
+          Tipo: getAppointmentTypeLabel(item),
+          Servicio: getServiceLabel(item),
+          Correo: item.correo ?? "",
           Estado: labels[item.status],
           "Total de citas del contacto": contact?.totalAppointments ?? history.length,
           "Ultima cita del contacto": contact?.lastAppointmentDate ?? item.date,
@@ -499,8 +520,10 @@ export function PanelDashboard() {
                       <div>
                         <strong>Cita para: {item.date} - {item.time}</strong>
                         <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
+                        <p className="copy">Tipo: {getAppointmentTypeLabel(item)} - {getServiceLabel(item)}</p>
                         <p className="copy">Agendada el: {getRegistrationLabel(item.createdAt)}</p>
                         <p className="copy">WhatsApp: {item.whatsapp}</p>
+                        {item.correo && <p className="copy">Correo: {item.correo}</p>}
                         <p className="copy">Google Contacts: {getGoogleContactsLabel(googleContactId)}</p>
                         <p className="copy">Total de citas: {totalAppointments} - Ultima cita: {lastAppointmentDate}</p>
                         {history.length > 0 && <p className="copy">Historial de citas: {formatHistory(history)}</p>}
