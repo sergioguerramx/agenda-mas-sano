@@ -195,19 +195,42 @@ function getPatientName(appointment: AppointmentRow) {
   return `${appointment.first_name} ${appointment.last_name}`.replace(/\s+/g, " ").trim();
 }
 
+function isYoSoySanoAppointment(appointment: AppointmentRow) {
+  return appointment.brand === "yo_soy_sano" || appointment.origin === "yosoysano";
+}
+
+function getAppointmentSummary(appointment: AppointmentRow) {
+  const patientName = getPatientName(appointment);
+
+  if (isYoSoySanoAppointment(appointment)) {
+    return appointment.service === "paquete_1199"
+      ? `YSS PAQUETE - ${patientName}`
+      : `YSS ONLINE $399 - ${patientName}`;
+  }
+
+  return `PX $399 - ${patientName}`;
+}
+
 function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = appointment.status) {
   const config = getCalendarConfig();
   const patientName = getPatientName(appointment);
   const statusLabel = getStatusLabel(status);
+  const isYss = isYoSoySanoAppointment(appointment);
 
   return {
-    summary: `PX $399 - ${patientName}`,
+    summary: getAppointmentSummary(appointment),
     description: [
       `Paciente: ${patientName}`,
       `WhatsApp: ${appointment.whatsapp}`,
+      appointment.correo ? `Correo: ${appointment.correo}` : "",
+      isYss ? "Marca: Yo Soy Sano" : "Marca: Más Sano",
+      isYss ? "Modalidad: Online" : "Modalidad: Presencial",
+      appointment.service ? `Servicio: ${appointment.service}` : "",
+      appointment.registro_id ? `Registro Yo Soy Sano: ${appointment.registro_id}` : "",
+      appointment.cliente_id ? `Cliente Yo Soy Sano: ${appointment.cliente_id}` : "",
       `Estado interno: ${statusLabel}`,
-      "Origen: Agenda Mas Sano"
-    ].join("\n"),
+      isYss ? "Origen: Yo Soy Sano" : "Origen: Agenda Mas Sano"
+    ].filter(Boolean).join("\n"),
     start: {
       dateTime: `${appointment.appointment_date}T${appointment.appointment_time.slice(0, 5)}:00`,
       timeZone: config.timeZone
