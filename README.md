@@ -51,6 +51,7 @@ Variables preparadas:
 - `RESEND_FROM_EMAIL`
 - `INTERNAL_NOTIFY_EMAIL`
 - `NEXT_PUBLIC_WHATSAPP_PHONE`
+- `YOSOYSANO_BOOKING_TOKEN_SECRET`
 
 No se deben subir secretos reales al repositorio.
 
@@ -88,6 +89,30 @@ Para conectar Supabase:
 3. Activar Google como proveedor de autenticacion.
 4. Completar las variables de Supabase en `.env.local`.
 5. Mantener Supabase como fuente principal de verdad para citas, contactos y administradores.
+
+### Yo Soy Sano Online
+
+La agenda puede recibir llamadas online de Yo Soy Sano despues de que la clienta llena su registro en `yosoysano.com`.
+
+Ruta privada:
+
+`/agendar/yosoysano/[token]`
+
+Reglas:
+
+- Solo se puede entrar con un enlace generado desde Yo Soy Sano.
+- No se agenda Plan Express.
+- Las citas se guardan como `Yo Soy Sano Online`.
+- Los eventos en Google Calendar se crean como `YSS ONLINE $399 - Nombre` o `YSS PAQUETE - Nombre`.
+- La disponibilidad es la misma de Más Sano; si un horario ya esta ocupado en Google Calendar, no aparece disponible.
+
+Para activarlo:
+
+1. Ejecutar `supabase/fase-8-yosoysano-online.sql` en Supabase.
+2. Configurar la misma clave privada `YOSOYSANO_BOOKING_TOKEN_SECRET` en Vercel para:
+   - `yosoysano-platform`
+   - `agenda-mas-sano`
+3. Confirmar que `NEXT_PUBLIC_AGENDA_URL` en Yo Soy Sano apunte a `https://agenda.massanonh.com`.
 
 ### Login del panel
 
