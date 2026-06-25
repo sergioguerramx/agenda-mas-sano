@@ -13,6 +13,13 @@ export type Appointment = AppointmentDraft & {
   status: AppointmentStatus;
   createdAt?: string;
   googleContactId?: string | null;
+  brand?: string | null;
+  modality?: string | null;
+  service?: string | null;
+  origin?: string | null;
+  registroId?: string | null;
+  clienteId?: string | null;
+  correo?: string | null;
 };
 
 export type AppointmentRow = {
@@ -26,6 +33,13 @@ export type AppointmentRow = {
   google_calendar_event_id?: string | null;
   google_contact_id?: string | null;
   resend_email_id?: string | null;
+  brand?: string | null;
+  modality?: string | null;
+  service?: string | null;
+  origin?: string | null;
+  registro_id?: string | null;
+  cliente_id?: string | null;
+  correo?: string | null;
   created_at?: string;
   updated_at?: string;
 };
