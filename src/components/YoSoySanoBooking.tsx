@@ -124,7 +124,12 @@ export function YoSoySanoBooking({ token }: { token: string }) {
       <div className="shell">
         <header className="top">
           <div className="brand">
-            <div className="mark">YSS</div>
+            <img
+              alt="Yo Soy Sano"
+              className="logo logo-yss"
+              src="https://yosoysano.com/images/logo-yosoysano.webp"
+              style={{ height: "3.25rem", width: "6.9rem" }}
+            />
             <div>
               <p className="eyebrow">Yo Soy Sano Online</p>
               <h1 className="title">Agenda tu llamada</h1>
@@ -138,8 +143,8 @@ export function YoSoySanoBooking({ token }: { token: string }) {
             <span className="price-pill">{getServiceLabel(preview.servicio)}</span>
             <h2>Elige el horario para tu llamada online.</h2>
             <p className="lead">
-              Usaremos la misma disponibilidad del equipo para evitar dobles reservas.
-              Tu llamada quedará marcada como Yo Soy Sano Online.
+              Esta agenda usa la disponibilidad compartida del equipo para cuidar tu horario
+              y evitar dobles reservas. Tu llamada quedará marcada como Yo Soy Sano Online.
             </p>
             <section className="info-block compact">
               <h3>Registro recibido</h3>
