@@ -143,8 +143,8 @@ export function YoSoySanoBooking({ token }: { token: string }) {
             <span className="price-pill">{getServiceLabel(preview.servicio)}</span>
             <h2>Elige el horario para tu llamada online.</h2>
             <p className="lead">
-              Esta agenda usa la disponibilidad compartida del equipo para cuidar tu horario
-              y evitar dobles reservas. Tu llamada quedará marcada como Yo Soy Sano Online.
+              Elige el día y horario que mejor se acomode para tu llamada. Te
+              recomendamos agendar con tiempo para asegurar tu espacio.
             </p>
             <section className="info-block compact">
               <h3>Registro recibido</h3>
@@ -158,7 +158,7 @@ export function YoSoySanoBooking({ token }: { token: string }) {
               {[
                 ["date", "Fecha"],
                 ["time", "Horario"],
-                ["done", "Final"]
+                ["done", "Listo"]
               ].map(([key, label]) => (
                 <button className={step === key ? "active" : ""} key={key} type="button">{label}</button>
               ))}
@@ -210,7 +210,7 @@ export function YoSoySanoBooking({ token }: { token: string }) {
                         type="button"
                       >
                         <strong>{slot.label}</strong>
-                        <span>{slot.available ? `${slot.remaining} lugares` : "No disponible"}</span>
+                        <span>{slot.available ? "Disponible" : "No disponible"}</span>
                       </button>
                     ))}
                   </div>
@@ -227,7 +227,7 @@ export function YoSoySanoBooking({ token }: { token: string }) {
                 <section className="success">
                   <CheckCircle2 size={42} />
                   <h2>Llamada agendada</h2>
-                  <p className="copy">Tu horario quedó registrado como Yo Soy Sano Online.</p>
+                  <p className="copy">Tu llamada quedó agendada. Te esperamos en el horario elegido.</p>
                   <div className="summary">
                     <div className="row"><span>Cliente</span><strong>{preview.nombre}</strong></div>
                     <div className="row"><span>Servicio</span><strong>{getServiceLabel(preview.servicio)}</strong></div>
