@@ -34,6 +34,10 @@ type MetaPurchasePayload = {
   test_event_code?: string;
 };
 
+type MetaPurchaseOptions = {
+  eventTime?: number;
+};
+
 const META_API_VERSION = "v20.0";
 const PURCHASE_VALUE = 399;
 const PURCHASE_CURRENCY = "MXN";
@@ -124,13 +128,13 @@ export function buildMasSanoMetaPurchasePayload(appointment: AppointmentRow, eve
   return payload;
 }
 
-export async function sendMasSanoPurchaseToMeta(appointment: AppointmentRow) {
+export async function sendMasSanoPurchaseToMeta(appointment: AppointmentRow, options: MetaPurchaseOptions = {}) {
   if (!isMetaConfigured()) {
     return { status: "skipped", reason: "Meta environment variables are not configured." };
   }
 
   const config = getMetaConfig();
-  const payload = buildMasSanoMetaPurchasePayload(appointment);
+  const payload = buildMasSanoMetaPurchasePayload(appointment, options.eventTime);
   const url = `https://graph.facebook.com/${META_API_VERSION}/${encodeURIComponent(config.eventSetId)}/events`;
 
   try {
