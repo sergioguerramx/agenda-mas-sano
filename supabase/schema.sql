@@ -27,6 +27,17 @@ where status in ('pending', 'confirmed');
 
 create index if not exists appointments_date_status_idx on public.appointments (appointment_date, status);
 
+alter table public.appointments
+  add column if not exists brand text not null default 'mas_sano',
+  add column if not exists modality text not null default 'presencial',
+  add column if not exists service text not null default 'sesion_integral_399',
+  add column if not exists origin text not null default 'agenda_mas_sano',
+  add column if not exists registro_id uuid,
+  add column if not exists cliente_id uuid,
+  add column if not exists correo text;
+
+create index if not exists appointments_origin_idx on public.appointments (origin);
+
 create table if not exists public.contacts (
   id uuid primary key default gen_random_uuid(),
   first_name text not null,
