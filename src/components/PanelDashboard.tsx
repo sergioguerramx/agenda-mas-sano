@@ -169,6 +169,25 @@ function getServiceLabel(item: Appointment) {
   return "Sesión Integral $399";
 }
 
+function getAdOriginLabel(value?: string | null) {
+  const labelsByValue: Record<string, string> = {
+    agenda_mas_sano: "Sin identificar",
+    sin_identificar: "Sin identificar",
+    anuncio_n1: "Anuncio N1",
+    anuncio_n2: "Anuncio N2",
+    anuncio_n3: "Anuncio N3",
+    anuncio_n4: "Anuncio N4",
+    anuncio_n5: "Anuncio N5",
+    whatsapp_directo: "WhatsApp directo",
+    recomendacion: "Recomendación",
+    organico: "Orgánico",
+    otro: "Otro",
+    yosoysano: "Yo Soy Sano"
+  };
+
+  return labelsByValue[value ?? ""] ?? value ?? "Sin identificar";
+}
+
 function getWhatsAppUrl(whatsapp: string) {
   const digits = whatsapp.replace(/\D/g, "");
   return `https://wa.me/${digits}`;
@@ -435,6 +454,7 @@ export function PanelDashboard() {
           WhatsApp: item.whatsapp,
           Tipo: getAppointmentTypeLabel(item),
           Servicio: getServiceLabel(item),
+          "Origen de cita": getAdOriginLabel(item.origin),
           Correo: item.correo ?? "",
           Estado: labels[item.status],
           "Total de citas del contacto": contact?.totalAppointments ?? history.length,
@@ -521,6 +541,7 @@ export function PanelDashboard() {
                         <strong>Cita para: {item.date} - {item.time}</strong>
                         <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
                         <p className="copy">Tipo: {getAppointmentTypeLabel(item)} - {getServiceLabel(item)}</p>
+                        <p className="copy">Origen de cita: {getAdOriginLabel(item.origin)}</p>
                         <p className="copy">Agendada el: {getRegistrationLabel(item.createdAt)}</p>
                         <p className="copy">WhatsApp: {item.whatsapp}</p>
                         {item.correo && <p className="copy">Correo: {item.correo}</p>}
