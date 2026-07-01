@@ -47,6 +47,13 @@ async function verifyAdmin(request: Request) {
   return Boolean(!error && isAllowedAdminEmail(email));
 }
 
+function verifyBackfillSecret(request: Request) {
+  const expectedSecret = (process.env.MAS_SANO_META_BACKFILL_SECRET ?? "").trim();
+  const providedSecret = (request.headers.get("x-mas-sano-backfill-secret") ?? "").trim();
+
+  return Boolean(expectedSecret && providedSecret && expectedSecret === providedSecret);
+}
+
 function normalizeLimit(value: unknown) {
   const numeric = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_LIMIT;
@@ -87,7 +94,8 @@ export async function POST(request: Request) {
   }
 
   const isAdmin = await verifyAdmin(request);
-  if (!isAdmin) {
+  const hasBackfillSecret = verifyBackfillSecret(request);
+  if (!isAdmin && !hasBackfillSecret) {
     return NextResponse.json({ error: "No tienes acceso a esta accion." }, { status: 403 });
   }
 
