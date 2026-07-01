@@ -4,6 +4,7 @@ import { buildSlotsForDate } from "@/lib/schedule";
 import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent, isGoogleCalendarSlotAvailable } from "@/services/google-calendar";
 import { isGoogleContactsConfigured, upsertGoogleContact } from "@/services/google-contacts";
+import { sendMasSanoPurchaseToMeta } from "@/services/meta-offline";
 import { sendInternalAppointmentEmail } from "@/services/resend";
 import type { AppointmentRow } from "@/types/appointments";
 
@@ -13,12 +14,30 @@ type RequestPayload = {
   whatsapp?: string;
   date?: string;
   time?: string;
+  adOrigin?: string;
 };
 
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
 type PublicAppointmentResponse = { success: boolean; appointment_id?: string };
 
 const SLOT_TAKEN_MESSAGE = "Este horario acaba de ocuparse. Elige otro horario disponible.";
+const VALID_AD_ORIGINS = new Set([
+  "sin_identificar",
+  "anuncio_n1",
+  "anuncio_n2",
+  "anuncio_n3",
+  "anuncio_n4",
+  "anuncio_n5",
+  "whatsapp_directo",
+  "recomendacion",
+  "organico",
+  "otro"
+]);
+
+function normalizeAdOrigin(value?: string) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return VALID_AD_ORIGINS.has(normalized) ? normalized : "sin_identificar";
+}
 
 function readErrorField(error: unknown, field: string) {
   if (!error || typeof error !== "object" || !(field in error)) return undefined;
@@ -284,7 +303,7 @@ export async function POST(request: Request) {
 
       let appointmentQuery = adminSupabase
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, created_at, updated_at");
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, brand, modality, service, origin, registro_id, cliente_id, correo, created_at, updated_at");
 
       if (createdAppointmentId) {
         appointmentQuery = appointmentQuery.eq("id", createdAppointmentId);
@@ -337,6 +356,24 @@ export async function POST(request: Request) {
       }
 
       row = appointment as AppointmentRow;
+      const adOrigin = normalizeAdOrigin(payload.adOrigin);
+
+      if (row.id && row.origin !== adOrigin) {
+        const { error: originError } = await adminSupabase
+          .from("appointments")
+          .update({ origin: adOrigin })
+          .eq("id", row.id);
+
+        if (originError) {
+          logAutomationWarning("Appointment ad origin update warning", originError, {
+            appointmentId: row.id,
+            adOrigin
+          });
+        } else {
+          row = { ...row, origin: adOrigin };
+        }
+      }
+
       console.info("Appointment automation appointment loaded", {
         createdAppointmentId,
         appointmentId: row.id,
@@ -360,6 +397,16 @@ export async function POST(request: Request) {
     }
 
     const automationStatus: Record<string, string> = {};
+
+    try {
+      const metaResult = await sendMasSanoPurchaseToMeta(row);
+      automationStatus.metaPurchase = metaResult.status;
+    } catch (metaError) {
+      automationStatus.metaPurchase = "failed";
+      logAutomationWarning("Meta purchase automation warning", metaError, {
+        appointmentId: row.id
+      });
+    }
 
     try {
       if (!adminSupabase) throw new Error("No se pudo conectar contactos.");
