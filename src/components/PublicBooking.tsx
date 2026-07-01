@@ -17,8 +17,22 @@ const emptyDraft: AppointmentDraft = {
   lastName: "",
   whatsapp: "",
   date: "",
-  time: ""
+  time: "",
+  adOrigin: "sin_identificar"
 };
+
+const adOriginOptions = [
+  { value: "sin_identificar", label: "Sin identificar" },
+  { value: "anuncio_n1", label: "Anuncio N1" },
+  { value: "anuncio_n2", label: "Anuncio N2" },
+  { value: "anuncio_n3", label: "Anuncio N3" },
+  { value: "anuncio_n4", label: "Anuncio N4" },
+  { value: "anuncio_n5", label: "Anuncio N5" },
+  { value: "whatsapp_directo", label: "WhatsApp directo" },
+  { value: "recomendacion", label: "Recomendación" },
+  { value: "organico", label: "Orgánico" },
+  { value: "otro", label: "Otro" }
+];
 
 const sessionIncludes = [
   "Sesión con nutrióloga certificada",
@@ -149,7 +163,8 @@ export function PublicBooking() {
           lastName: draft.lastName.trim(),
           whatsapp,
           date: draft.date,
-          time: draft.time
+          time: draft.time,
+          adOrigin: draft.adOrigin
         })
       });
 
@@ -306,6 +321,7 @@ export function PublicBooking() {
                     <div className="field"><label htmlFor="firstName">Nombre</label><input id="firstName" value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} /></div>
                     <div className="field"><label htmlFor="lastName">Apellidos</label><input id="lastName" value={draft.lastName} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} /></div>
                     <div className="field"><label htmlFor="whatsapp">WhatsApp</label><input id="whatsapp" inputMode="tel" placeholder="+52 55 1234 5678" value={draft.whatsapp} onChange={(event) => setDraft({ ...draft, whatsapp: event.target.value })} /></div>
+                    <div className="field"><label htmlFor="adOrigin">Origen de la cita</label><select id="adOrigin" value={draft.adOrigin} onChange={(event) => setDraft({ ...draft, adOrigin: event.target.value })}>{adOriginOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
                   </div>
                   <div className="summary"><div className="row"><span>Fecha</span><strong>{draft.date ? formatDisplayDate(draft.date) : ""}</strong></div><div className="row"><span>Hora</span><strong>{draft.time}</strong></div></div>
                   {error && <p className="error">{error}</p>}
