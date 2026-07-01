@@ -6,6 +6,7 @@ export type AppointmentDraft = {
   whatsapp: string;
   date: string;
   time: string;
+  adOrigin?: string;
 };
 
 export type Appointment = AppointmentDraft & {
