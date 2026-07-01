@@ -20,14 +20,15 @@ type MetaPurchasePayload = {
     event_time: number;
     event_id: string;
     action_source: "physical_store";
-    user_data: Record<string, string>;
+    user_data: Record<string, string[]>;
     custom_data: {
       value: 399;
       currency: "MXN";
-      content_name: "Sesion 399";
+      content_name: "Sesión 399";
       content_category: "servicio_local";
       order_id: string;
       source: "agenda_mas_sano";
+      ad_source?: string;
     };
   }>;
   test_event_code?: string;
@@ -58,6 +59,15 @@ export function normalizeEmail(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
 }
 
+export function normalizeName(value?: string | null) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
 export function hashForMeta(value?: string | null) {
   const normalized = (value ?? "").trim();
   if (!normalized) return "";
@@ -69,17 +79,32 @@ function getSafeError(error: unknown) {
   return { message: String(error) };
 }
 
+function addUserData(userData: Record<string, string[]>, key: string, value: string) {
+  const hashed = hashForMeta(value);
+  if (hashed) userData[key] = [hashed];
+}
+
 export function buildMasSanoMetaPurchasePayload(appointment: AppointmentRow, eventTime = Math.floor(Date.now() / 1000)): MetaPurchasePayload {
   const config = getMetaConfig();
   const appointmentId = appointment.id;
-  const phone = normalizePhone(appointment.whatsapp);
-  const email = normalizeEmail(appointment.correo);
-  const userData: Record<string, string> = {
-    external_id: hashForMeta(appointmentId)
+  const userData: Record<string, string[]> = {};
+
+  addUserData(userData, "external_id", appointmentId);
+  addUserData(userData, "ph", normalizePhone(appointment.whatsapp));
+  addUserData(userData, "em", normalizeEmail(appointment.correo));
+  addUserData(userData, "fn", normalizeName(appointment.first_name));
+  addUserData(userData, "ln", normalizeName(appointment.last_name));
+
+  const customData: MetaPurchasePayload["data"][number]["custom_data"] = {
+    value: PURCHASE_VALUE,
+    currency: PURCHASE_CURRENCY,
+    content_name: "Sesión 399",
+    content_category: "servicio_local",
+    order_id: appointmentId,
+    source: "agenda_mas_sano"
   };
 
-  if (phone) userData.ph = hashForMeta(phone);
-  if (email) userData.em = hashForMeta(email);
+  if (appointment.origin) customData.ad_source = appointment.origin;
 
   const payload: MetaPurchasePayload = {
     data: [
@@ -89,14 +114,7 @@ export function buildMasSanoMetaPurchasePayload(appointment: AppointmentRow, eve
         event_id: appointmentId,
         action_source: "physical_store",
         user_data: userData,
-        custom_data: {
-          value: PURCHASE_VALUE,
-          currency: PURCHASE_CURRENCY,
-          content_name: "Sesion 399",
-          content_category: "servicio_local",
-          order_id: appointmentId,
-          source: "agenda_mas_sano"
-        }
+        custom_data: customData
       }
     ]
   };
