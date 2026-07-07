@@ -128,8 +128,7 @@ async function getExistingAppointment(payload: RequestPayload, normalizedTime: s
       .eq("whatsapp", payload.whatsapp)
       .neq("status", "cancelled")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(10);
 
     if (error) {
       logAutomationWarning("Existing appointment lookup warning", error, {
@@ -142,7 +141,13 @@ async function getExistingAppointment(payload: RequestPayload, normalizedTime: s
       return null;
     }
 
-    return data as AppointmentRow | null;
+    const normalizedFirstName = normalizeNameForComparison(payload.firstName);
+    const normalizedLastName = normalizeNameForComparison(payload.lastName);
+
+    return ((data ?? []) as AppointmentRow[]).find((appointment) => {
+      return normalizeNameForComparison(appointment.first_name) === normalizedFirstName
+        && normalizeNameForComparison(appointment.last_name) === normalizedLastName;
+    }) ?? null;
   } catch (error) {
     logAutomationWarning("Existing appointment lookup failed", error, {
       payload: {
@@ -153,6 +158,15 @@ async function getExistingAppointment(payload: RequestPayload, normalizedTime: s
     });
     return null;
   }
+}
+
+function normalizeNameForComparison(value?: string) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function alreadyCreatedResponse(appointment: AppointmentRow) {
