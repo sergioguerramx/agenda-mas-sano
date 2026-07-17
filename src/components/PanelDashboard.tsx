@@ -19,6 +19,15 @@ const PANEL_REQUEST_TIMEOUT_MS = 12000;
 const TIME_ZONE = "America/Monterrey";
 type PanelView = "appointments" | "contacts";
 
+function getTodayInTimeZone() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
 function getPanelRedirectUrl() {
   const browserOrigin = window.location.origin.replace(/\/+$/, "");
   const envSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
@@ -226,8 +235,8 @@ export function PanelDashboard() {
   const [loading, setLoading] = useState(true);
   const [appointmentDateFrom, setAppointmentDateFrom] = useState("");
   const [appointmentDateTo, setAppointmentDateTo] = useState("");
-  const [registrationDateFrom, setRegistrationDateFrom] = useState("");
-  const [registrationDateTo, setRegistrationDateTo] = useState("");
+  const [registrationDateFrom, setRegistrationDateFrom] = useState(getTodayInTimeZone);
+  const [registrationDateTo, setRegistrationDateTo] = useState(getTodayInTimeZone);
   const [view, setView] = useState<PanelView>("appointments");
   const [items, setItems] = useState<Appointment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
