@@ -235,6 +235,11 @@ export function PanelDashboard() {
   const [contactDate, setContactDate] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+    if (requestedView === "contacts") setView("contacts");
+  }, []);
+
   const appointmentHistoryByWhatsapp = useMemo(() => {
     const grouped = new Map<string, Appointment[]>();
     items.forEach((item) => {
@@ -493,6 +498,7 @@ export function PanelDashboard() {
           <div className="tabs">
             <button className={view === "appointments" ? "active" : ""} onClick={() => setView("appointments")} type="button">Agenda</button>
             <button className={view === "contacts" ? "active" : ""} onClick={() => setView("contacts")} type="button">Contactos</button>
+            <button onClick={() => { window.location.href = "/panel/google-contacts"; }} type="button">Google Contacts</button>
           </div>
           {message && <p className="error">{message}</p>}
           {view === "appointments" && (

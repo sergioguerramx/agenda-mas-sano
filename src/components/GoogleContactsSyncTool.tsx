@@ -183,6 +183,11 @@ export function GoogleContactsSyncTool() {
     <main className="page">
       <section className="shell">
         <div className="panel-card card">
+          <div className="tabs">
+            <button onClick={() => { window.location.href = "/panel"; }} type="button">Agenda</button>
+            <button onClick={() => { window.location.href = "/panel?view=contacts"; }} type="button">Contactos</button>
+            <button className="active" type="button">Google Contacts</button>
+          </div>
           <p className="eyebrow">Panel interno</p>
           <h1 className="title">Google Contacts</h1>
           <p className="copy">Revisa la conexion y agrega a Google Contacts los contactos pendientes de la agenda.</p>

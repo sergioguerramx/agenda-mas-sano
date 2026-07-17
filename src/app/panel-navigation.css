@@ -1,0 +1,15 @@
+@media (max-width: 520px) {
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .tabs button {
+    min-width: 0;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+}

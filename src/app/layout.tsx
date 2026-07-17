@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthRedirectHandler } from "@/components/AuthRedirectHandler";
 import "./globals.css";
+import "./panel-navigation.css";
 
 export const metadata: Metadata = {
   title: "Agenda Mas Sano",
