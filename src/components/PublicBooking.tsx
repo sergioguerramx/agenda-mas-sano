@@ -83,6 +83,24 @@ export function PublicBooking() {
   const selectedSlot = slots.find((slot) => slot.time === draft.time);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fullName = params.get("name")?.trim().replace(/\s+/g, " ") ?? "";
+    const nameParts = fullName ? fullName.split(" ") : [];
+    const whatsapp = params.get("whatsapp")?.trim() ?? "";
+    const adOrigin = params.get("adOrigin")?.trim() ?? "";
+
+    if (!fullName && !whatsapp && !adOrigin) return;
+
+    setDraft((current) => ({
+      ...current,
+      firstName: nameParts[0] ?? current.firstName,
+      lastName: nameParts.slice(1).join(" ") || current.lastName,
+      whatsapp: whatsapp || current.whatsapp,
+      adOrigin: adOriginOptions.some((option) => option.value === adOrigin) ? adOrigin : current.adOrigin
+    }));
+  }, []);
+
+  useEffect(() => {
     let ignore = false;
 
     async function loadReservedSlots() {
