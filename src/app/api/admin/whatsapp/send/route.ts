@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   const accessToken = (process.env.META_WHATSAPP_ACCESS_TOKEN ?? "").trim();
   const phoneNumberId = (process.env.META_WHATSAPP_PHONE_NUMBER_ID ?? "").trim();
-  const apiVersion = (process.env.META_GRAPH_API_VERSION ?? "v23.0").trim();
+  const apiVersion = (process.env.META_GRAPH_API_VERSION ?? "v25.0").trim();
   if (!accessToken || !phoneNumberId) {
     return NextResponse.json({ error: "El número de campañas todavía no está completamente conectado." }, { status: 503 });
   }
@@ -117,4 +117,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ message: savedMessage });
 }
-
