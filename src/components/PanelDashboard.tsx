@@ -507,6 +507,7 @@ export function PanelDashboard() {
           <div className="tabs">
             <button className={view === "appointments" ? "active" : ""} onClick={() => setView("appointments")} type="button">Agenda</button>
             <button className={view === "contacts" ? "active" : ""} onClick={() => setView("contacts")} type="button">Contactos</button>
+            <button onClick={() => { window.location.href = "/panel/mensajes"; }} type="button">Mensajes</button>
             <button onClick={() => { window.location.href = "/panel/google-contacts"; }} type="button">Google Contacts</button>
           </div>
           {message && <p className="error">{message}</p>}

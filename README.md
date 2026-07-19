@@ -16,6 +16,7 @@ El proyecto ya conecta la agenda publica y el panel interno con Supabase real.
 - Login con Supabase Auth y Google.
 - Lista real de citas con filtros, cambio de estado y copiado de WhatsApp.
 - Contactos internos en Supabase con busqueda y exportacion CSV.
+- Bandeja interna para recibir y contestar mensajes del numero de campañas.
 
 ## Correr localmente
 
@@ -52,8 +53,26 @@ Variables preparadas:
 - `INTERNAL_NOTIFY_EMAIL`
 - `NEXT_PUBLIC_WHATSAPP_PHONE`
 - `YOSOYSANO_BOOKING_TOKEN_SECRET`
+- `META_WHATSAPP_PHONE_NUMBER_ID`
+- `META_WHATSAPP_ACCESS_TOKEN`
+- `META_WHATSAPP_VERIFY_TOKEN`
+- `META_APP_SECRET`
+- `META_GRAPH_API_VERSION`
 
 No se deben subir secretos reales al repositorio.
+
+## Bandeja de WhatsApp
+
+La ruta `/panel/mensajes` concentra las conversaciones del numero de campañas. Relaciona el WhatsApp con los pacientes existentes sin fusionar familiares que comparten contacto.
+
+Para activarla:
+
+1. Ejecutar `supabase/fase-15-bandeja-whatsapp.sql`.
+2. Configurar las variables de Meta en Vercel.
+3. Registrar `https://agenda.massanonh.com/api/whatsapp/webhook` como webhook de WhatsApp.
+4. Suscribir el campo `messages`.
+
+Los mensajes de texto se contestan desde el panel. Para volver a iniciar una conversación después de la ventana permitida por WhatsApp se usará una plantilla aprobada; esa parte se preparará con la campaña piloto.
 
 ## Reglas de agenda
 
@@ -89,6 +108,26 @@ Para conectar Supabase:
 3. Activar Google como proveedor de autenticacion.
 4. Completar las variables de Supabase en `.env.local`.
 5. Mantener Supabase como fuente principal de verdad para citas, contactos y administradores.
+
+### Base historica optimizada
+
+`supabase/fase-11-pacientes-historial-optimizado.sql` prepara una estructura adicional que no interrumpe la agenda actual:
+
+- Pacientes separados de sus citas, permitiendo familiares con el mismo WhatsApp.
+- Historial compacto con sucursal, fecha, confirmacion, asistencia y cita liberada a las 8:00.
+- Segmentos calculados al consultar, sin guardar copias innecesarias.
+- Calendarios separados para San Nicolas y Monterrey Sur.
+- Registro minimo de campañas y exclusiones, sin guardar notas clinicas.
+- Reflejo automatico de las citas nuevas que ya genera la pagina.
+- Consentimiento promocional activo por la autorizacion fisica general; una exclusion expresa siempre tiene prioridad.
+
+La migracion historica se prepara primero en modo local con:
+
+```bash
+npm run prepare:historical-import -- --input=/ruta/processed_cleaned.json --branch=MTY_SUR --limit=100
+```
+
+Este comando no escribe en Supabase y no incluye los textos originales de Calendar.
 
 ### Yo Soy Sano Online
 
