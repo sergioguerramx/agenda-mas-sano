@@ -196,14 +196,26 @@ export function WhatsAppInbox() {
     setNotice("");
     const body = draft.trim();
     try {
-      const response = await fetch("/api/admin/whatsapp/send", {
+      const sendWithToken = (accessToken: string) => fetch("/api/admin/whatsapp/send", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ conversationId: selected.id, body })
       });
+
+      const { data: currentSessionData } = await client.auth.getSession();
+      let accessToken = currentSessionData.session?.access_token ?? session.access_token;
+      let response = await sendWithToken(accessToken);
+
+      if (response.status === 401) {
+        const { data: refreshedSessionData, error: refreshError } = await client.auth.refreshSession();
+        accessToken = refreshedSessionData.session?.access_token ?? "";
+        if (refreshError || !accessToken) throw new Error("Tu sesión terminó. Vuelve a entrar con Google.");
+        response = await sendWithToken(accessToken);
+      }
+
       const data = await response.json() as { error?: string; message?: InboxMessage };
       if (!response.ok || !data.message) throw new Error(data.error ?? "No se pudo enviar.");
       setDraft("");
@@ -280,4 +292,3 @@ export function WhatsAppInbox() {
     </main>
   );
 }
-
