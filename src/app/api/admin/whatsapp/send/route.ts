@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServiceRoleClient, getSupabaseConfig } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -8,20 +9,17 @@ async function getAdminEmail(request: NextRequest) {
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return "";
 
-  const serviceClient = createSupabaseServiceRoleClient();
-  const { data, error } = await serviceClient.auth.getUser(token);
-  if (error) return "";
-
-  const email = data.user?.email ?? "";
-  if (!email) return "";
-
-  const { data: admin } = await serviceClient
+  const config = getSupabaseConfig();
+  const userClient = createClient(config.url, config.anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  const { data: admin, error } = await userClient
     .from("admin_users")
     .select("email")
-    .eq("email", email)
     .maybeSingle();
 
-  return admin ? email : "";
+  return error ? "" : admin?.email ?? "";
 }
 
 export async function POST(request: NextRequest) {
