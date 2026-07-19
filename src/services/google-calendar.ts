@@ -70,9 +70,9 @@ class GoogleCalendarApiError extends Error {
   }
 }
 
-function getCalendarConfig() {
+function getCalendarConfig(calendarIdOverride?: string) {
   return {
-    calendarId: (process.env.GOOGLE_CALENDAR_ID ?? "").trim(),
+    calendarId: (calendarIdOverride ?? process.env.GOOGLE_CALENDAR_ID ?? "").trim(),
     serviceAccountEmail: (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "").trim(),
     privateKey: (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n").trim(),
     timeZone: (process.env.GOOGLE_CALENDAR_TIME_ZONE ?? DEFAULT_TIME_ZONE).trim(),
@@ -80,8 +80,8 @@ function getCalendarConfig() {
   };
 }
 
-export function isGoogleCalendarConfigured() {
-  const config = getCalendarConfig();
+export function isGoogleCalendarConfigured(calendarIdOverride?: string) {
+  const config = getCalendarConfig(calendarIdOverride);
   return Boolean(config.calendarId && config.serviceAccountEmail && config.privateKey);
 }
 
@@ -242,8 +242,13 @@ function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = a
   };
 }
 
-async function callGoogleCalendar(path: string, init: RequestInit, requestInfo?: Record<string, string>) {
-  const config = getCalendarConfig();
+async function callGoogleCalendar(
+  path: string,
+  init: RequestInit,
+  requestInfo?: Record<string, string>,
+  calendarIdOverride?: string
+) {
+  const config = getCalendarConfig(calendarIdOverride);
   const accessToken = await getGoogleAccessToken();
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(config.calendarId)}${path}`;
 
@@ -334,12 +339,12 @@ function isNonAppointmentCalendarBlock(event: GoogleCalendarEvent) {
   return NON_APPOINTMENT_CALENDAR_KEYWORDS.some((keyword) => text.includes(keyword));
 }
 
-async function listGoogleCalendarEvents(date: string) {
-  if (!isGoogleCalendarConfigured()) {
+async function listGoogleCalendarEvents(date: string, calendarIdOverride?: string) {
+  if (!isGoogleCalendarConfigured(calendarIdOverride)) {
     throw new Error("Google Calendar no esta configurado.");
   }
 
-  const config = getCalendarConfig();
+  const config = getCalendarConfig(calendarIdOverride);
   const { timeMin, timeMax } = getDayRange(date);
   const params = new URLSearchParams({
     timeMin,
@@ -354,13 +359,17 @@ async function listGoogleCalendarEvents(date: string) {
     timeMin,
     timeMax,
     timeZone: config.timeZone
-  }) as GoogleCalendarEventsResponse;
+  }, calendarIdOverride) as GoogleCalendarEventsResponse;
   return (body.items ?? []).filter((event) => event.status !== "cancelled" && !isNonAppointmentCalendarBlock(event));
 }
 
-export async function getGoogleCalendarSlotCounts(date: string, slotTimes: string[]): Promise<CalendarSlotCount[]> {
-  const config = getCalendarConfig();
-  const events = await listGoogleCalendarEvents(date);
+export async function getGoogleCalendarSlotCounts(
+  date: string,
+  slotTimes: string[],
+  calendarIdOverride?: string
+): Promise<CalendarSlotCount[]> {
+  const config = getCalendarConfig(calendarIdOverride);
+  const events = await listGoogleCalendarEvents(date, calendarIdOverride);
   const windows = events
     .map((event) => getEventWindowForDate(event, date, config.timeZone))
     .filter((window): window is { start: number; end: number } => Boolean(window));
@@ -373,20 +382,23 @@ export async function getGoogleCalendarSlotCounts(date: string, slotTimes: strin
   });
 }
 
-export async function isGoogleCalendarSlotAvailable(date: string, time: string) {
-  const [slot] = await getGoogleCalendarSlotCounts(date, [time.slice(0, 5)]);
+export async function isGoogleCalendarSlotAvailable(date: string, time: string, calendarIdOverride?: string) {
+  const [slot] = await getGoogleCalendarSlotCounts(date, [time.slice(0, 5)], calendarIdOverride);
   return (slot?.count ?? 0) < getSlotCapacity(date, time);
 }
 
-export async function createGoogleCalendarEvent(appointment: AppointmentRow): Promise<CalendarResult> {
-  if (!isGoogleCalendarConfigured()) {
+export async function createGoogleCalendarEvent(
+  appointment: AppointmentRow,
+  calendarIdOverride?: string
+): Promise<CalendarResult> {
+  if (!isGoogleCalendarConfigured(calendarIdOverride)) {
     return { status: "skipped", reason: "Google Calendar no esta configurado." };
   }
 
   const body = await callGoogleCalendar("/events", {
     method: "POST",
     body: JSON.stringify(getEventBody(appointment, "pending"))
-  }) as GoogleCalendarEventResponse;
+  }, undefined, calendarIdOverride) as GoogleCalendarEventResponse;
 
   return { status: "created", eventId: body.id };
 }

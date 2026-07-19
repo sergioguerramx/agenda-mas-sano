@@ -41,6 +41,7 @@ export type AppointmentRow = {
   registro_id?: string | null;
   cliente_id?: string | null;
   correo?: string | null;
+  branch_code?: "SN" | "MTY_SUR" | null;
   created_at?: string;
   updated_at?: string;
 };

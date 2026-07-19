@@ -36,6 +36,23 @@
 .chat-action-bar::-webkit-scrollbar,.quick-replies::-webkit-scrollbar{display:none}
 .mini-action{flex:0 0 auto;min-height:2.2rem;padding:.42rem .62rem;font-size:.76rem}
 .mini-action.active{border-color:var(--olive);background:var(--mint);color:var(--ink)}
+.scheduler-panel{display:grid;gap:.7rem;max-height:390px;overflow:auto;padding:.8rem;border-bottom:1px solid var(--line);background:#fffaf4}
+.scheduler-heading{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.scheduler-heading>div{display:flex;align-items:center;gap:.5rem;color:var(--olive)}
+.scheduler-heading span{display:grid;gap:.08rem}
+.scheduler-heading small{color:var(--muted);font-size:.7rem;font-weight:500}
+.scheduler-heading .icon-button{width:2rem;height:2rem;flex-basis:2rem}
+.scheduler-form{display:grid;grid-template-columns:minmax(180px,1.3fr) repeat(2,minmax(135px,.8fr));gap:.55rem}
+.scheduler-form label{display:grid;gap:.25rem;color:var(--olive);font-size:.72rem;font-weight:800}
+.scheduler-form input,.scheduler-form select,.scheduler-patient-name{display:flex;align-items:center;width:100%;min-height:2.45rem;padding:.52rem .6rem;border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink);font:inherit;font-size:.8rem}
+.scheduler-times{display:grid;gap:.4rem;color:var(--olive);font-size:.78rem}
+.time-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:.38rem}
+.time-grid button{min-height:2.25rem;padding:.38rem;border:1px solid var(--line);border-radius:7px;background:white;color:var(--olive);font-size:.74rem;font-weight:800}
+.time-grid button:hover:not(:disabled),.time-grid button.active{border-color:var(--olive);background:var(--mint);color:var(--ink)}
+.time-grid button:disabled{background:#f1ece5;color:#aaa;cursor:not-allowed;text-decoration:line-through}
+.scheduler-notice{margin:0;font-size:.76rem}
+.scheduler-confirm{justify-self:end;min-height:2.5rem;padding:.5rem .8rem;font-size:.78rem}
+.scheduler-confirm:disabled{opacity:.5;cursor:not-allowed}
 .conversation-details-panel{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(270px,.85fr);gap:.7rem;max-height:300px;overflow:auto;padding:.7rem;border-bottom:1px solid var(--line);background:#fffaf4}
 .patient-summary-section,.follow-up-form{display:grid;align-content:start;gap:.55rem;padding:.7rem;border:1px solid var(--line);border-radius:8px;background:white}
 .detail-heading{display:flex;align-items:center;gap:.4rem;color:var(--olive);font-size:.85rem}
@@ -89,6 +106,10 @@
   .patient-matches{flex-basis:100%;justify-content:flex-start;padding-left:2.9rem;overflow-x:auto;flex-wrap:nowrap}
   .patient-matches .badge{flex:0 0 auto}
   .chat-action-bar{padding:.42rem .55rem}
+  .scheduler-panel{max-height:54dvh;padding:.6rem}
+  .scheduler-form{grid-template-columns:1fr 1fr}
+  .scheduler-form label:first-child{grid-column:1/-1}
+  .scheduler-confirm{width:100%;justify-self:stretch}
   .conversation-details-panel{grid-template-columns:1fr;max-height:46dvh;padding:.55rem}
   .patient-summary-section,.follow-up-form{padding:.6rem}
   .message-list{padding:.7rem}

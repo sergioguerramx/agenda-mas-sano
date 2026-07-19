@@ -1,29 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createSupabaseServiceRoleClient, getSupabaseConfig } from "@/lib/supabase";
+import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-async function getAdminEmail(request: NextRequest) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (!token) return "";
-
-  const config = getSupabaseConfig();
-  const userClient = createClient(config.url, config.anonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  const { data: admin, error } = await userClient
-    .from("admin_users")
-    .select("email")
-    .maybeSingle();
-
-  return error ? "" : admin?.email ?? "";
-}
-
 export async function POST(request: NextRequest) {
-  if (!await getAdminEmail(request)) {
+  if (!await getAuthenticatedAdminEmail(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

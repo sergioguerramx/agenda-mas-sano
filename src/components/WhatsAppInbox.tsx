@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   CalendarPlus,
+  CheckCircle2,
   ClipboardList,
   LogIn,
   MessageCircle,
@@ -14,9 +15,11 @@ import {
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isAllowedAdminEmail } from "@/lib/admin";
+import { buildAvailableDates } from "@/lib/schedule";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 
 const PRODUCTION_SITE_URL = "https://agenda.massanonh.com";
+const MTY_SUR_OPENING_DATE = "2026-08-03";
 
 const WORKFLOW_OPTIONS = [
   { value: "nuevo", label: "Nuevo" },
@@ -111,7 +114,14 @@ type PatientHistory = {
   cancelled: boolean;
 };
 
-type Branch = { id: number; name: string };
+type Branch = { id: number; code: string; name: string };
+
+type ScheduleSlot = {
+  time: string;
+  label: string;
+  available: boolean;
+  remaining: number;
+};
 
 function getPanelRedirectUrl() {
   const browserOrigin = window.location.origin.replace(/\/+$/, "");
@@ -218,6 +228,15 @@ export function WhatsAppInbox() {
   const [branchInterest, setBranchInterest] = useState("");
   const [adminNote, setAdminNote] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduleBranch, setScheduleBranch] = useState<"SN" | "MTY_SUR">("SN");
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleName, setScheduleName] = useState("");
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [savingAppointment, setSavingAppointment] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState("");
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
   const [sending, setSending] = useState(false);
@@ -228,6 +247,12 @@ export function WhatsAppInbox() {
   const activePatient = patientMatches.find((patient) => patient.patient_id === activePatientId) ?? patientMatches[0] ?? null;
   const activeHistory = patientHistory.filter((item) => item.patient_id === activePatient?.patient_id).slice(0, 5);
   const branchNames = useMemo(() => new Map(branches.map((branch) => [branch.id, branch.name])), [branches]);
+  const branchCodes = useMemo(() => new Map(branches.map((branch) => [branch.id, branch.code])), [branches]);
+  const availableDates = useMemo(() => buildAvailableDates(new Date()).filter((date) => !date.closed), []);
+  const scheduleDates = useMemo(
+    () => scheduleBranch === "MTY_SUR" ? availableDates.filter((date) => date.iso >= MTY_SUR_OPENING_DATE) : availableDates,
+    [availableDates, scheduleBranch]
+  );
   const filteredConversations = useMemo(() => {
     const value = search.trim().toLowerCase();
     return conversations.filter((item) => {
@@ -261,7 +286,7 @@ export function WhatsAppInbox() {
         .from("patient_activity_summary")
         .select("patient_id, full_name, first_appointment_at, last_appointment_at, last_attended_at, total_appointments, attended_appointments, has_future_appointment, last_branch_id, segment_key")
         .eq("whatsapp", conversation.whatsapp),
-      supabase.from("branches").select("id, name")
+      supabase.from("branches").select("id, code, name")
     ]);
 
     const patients = (patientData ?? []) as PatientMatch[];
@@ -341,6 +366,10 @@ export function WhatsAppInbox() {
     setBranchInterest(conversation.branch_interest ?? "");
     setAdminNote(conversation.admin_note ?? "");
     setShowDetails(false);
+    setShowScheduler(false);
+    setScheduleSlots([]);
+    setScheduleTime("");
+    setScheduleNotice("");
     setNotice("");
     await loadConversation(client, conversation);
   }
@@ -405,6 +434,101 @@ export function WhatsAppInbox() {
     }
   }
 
+  async function fetchAsAdmin(input: string, init?: RequestInit) {
+    if (!client || !session) throw new Error("Tu sesión terminó. Vuelve a entrar con Google.");
+    const { data: currentSessionData } = await client.auth.getSession();
+    let accessToken = currentSessionData.session?.access_token ?? session.access_token;
+    const run = (token: string) => {
+      const headers = new Headers(init?.headers);
+      headers.set("Authorization", `Bearer ${token}`);
+      return fetch(input, { ...init, headers });
+    };
+    let response = await run(accessToken);
+    if (response.status === 401) {
+      const { data: refreshedSessionData, error } = await client.auth.refreshSession();
+      accessToken = refreshedSessionData.session?.access_token ?? "";
+      if (error || !accessToken) throw new Error("Tu sesión terminó. Vuelve a entrar con Google.");
+      response = await run(accessToken);
+    }
+    return response;
+  }
+
+  async function loadScheduleAvailability(branch: "SN" | "MTY_SUR", date: string) {
+    if (!date) return;
+    setLoadingSchedule(true);
+    setScheduleNotice("");
+    setScheduleTime("");
+    try {
+      const response = await fetchAsAdmin(`/api/admin/whatsapp/availability?branch=${branch}&date=${date}`);
+      const data = await response.json() as { error?: string; slots?: ScheduleSlot[] };
+      if (!response.ok || !data.slots) throw new Error(data.error ?? "No pudimos cargar los horarios.");
+      setScheduleSlots(data.slots);
+      if (!data.slots.some((slot) => slot.available)) setScheduleNotice("Ya no hay horarios disponibles para ese día.");
+    } catch (error) {
+      setScheduleSlots([]);
+      setScheduleNotice(error instanceof Error ? error.message : "No pudimos cargar los horarios.");
+    } finally {
+      setLoadingSchedule(false);
+    }
+  }
+
+  function openScheduler() {
+    const patientBranch = activePatient?.last_branch_id ? branchCodes.get(activePatient.last_branch_id) : "";
+    const initialBranch = branchInterest === "MTY_SUR" || patientBranch === "MTY_SUR" ? "MTY_SUR" : "SN";
+    const initialDate = availableDates.find((date) => initialBranch === "SN" || date.iso >= MTY_SUR_OPENING_DATE)?.iso ?? "";
+    setScheduleBranch(initialBranch);
+    setScheduleDate(initialDate);
+    setScheduleName(activePatient?.full_name ?? selected?.contact_name ?? "");
+    setScheduleTime("");
+    setScheduleNotice("");
+    setShowDetails(false);
+    setShowScheduler(true);
+    if (initialDate) void loadScheduleAvailability(initialBranch, initialDate);
+  }
+
+  async function createAppointment() {
+    if (!client || !selected || !scheduleDate || !scheduleTime || savingAppointment) return;
+    setSavingAppointment(true);
+    setScheduleNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: selected.id,
+          patientId: activePatient?.patient_id ?? "",
+          fullName: scheduleName,
+          branchCode: scheduleBranch,
+          date: scheduleDate,
+          time: scheduleTime
+        })
+      });
+      const data = await response.json() as { error?: string; confirmationDraft?: string; branchName?: string };
+      if (!response.ok || !data.confirmationDraft) throw new Error(data.error ?? "No pudimos crear la cita.");
+      setDraft(data.confirmationDraft);
+      setWorkflowStatus("cita_agendada");
+      setBranchInterest(scheduleBranch);
+      setConversations((current) => current.map((item) => item.id === selected.id ? {
+        ...item,
+        workflow_status: "cita_agendada",
+        branch_interest: scheduleBranch
+      } : item));
+      setShowScheduler(false);
+      setNotice(`Cita creada en ${data.branchName}. La confirmación quedó preparada; revísala y envíala.`);
+      await loadConversation(client, {
+        ...selected,
+        workflow_status: "cita_agendada",
+        branch_interest: scheduleBranch
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No pudimos crear la cita.";
+      setScheduleNotice(message);
+      if (/ocup/.test(message.toLowerCase())) await loadScheduleAvailability(scheduleBranch, scheduleDate);
+    } finally {
+      setSavingAppointment(false);
+    }
+  }
+
   async function login() {
     if (!client) return;
     await client.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getPanelRedirectUrl() } });
@@ -461,9 +585,54 @@ export function WhatsAppInbox() {
                 </header>
 
                 <div className="chat-action-bar">
-                  <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer"><CalendarPlus size={16} />Agendar San Nicolás</a>
-                  <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => setShowDetails((value) => !value)} type="button"><UserRound size={16} />Ficha y seguimiento</button>
+                  <button className={`secondary mini-action ${showScheduler ? "active" : ""}`} onClick={openScheduler} type="button"><CalendarPlus size={16} />Agendar cita</button>
+                  <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => { setShowScheduler(false); setShowDetails((value) => !value); }} type="button"><UserRound size={16} />Ficha y seguimiento</button>
+                  <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer">Abrir agenda pública</a>
                 </div>
+
+                {showScheduler && (
+                  <section className="scheduler-panel">
+                    <div className="scheduler-heading">
+                      <div><CalendarPlus size={18} /><span><strong>Nueva cita</strong><small>Se guardará en la agenda de la sucursal elegida.</small></span></div>
+                      <button className="icon-button" onClick={() => setShowScheduler(false)} aria-label="Cerrar agendado" type="button"><ArrowLeft size={17} /></button>
+                    </div>
+                    <div className="scheduler-form">
+                      <label>Paciente
+                        {activePatient ? <strong className="scheduler-patient-name">{activePatient.full_name}</strong> : <input value={scheduleName} onChange={(event) => setScheduleName(event.target.value)} placeholder="Nombre completo" />}
+                      </label>
+                      <label>Sucursal
+                        <select value={scheduleBranch} onChange={(event) => {
+                          const branch = event.target.value as "SN" | "MTY_SUR";
+                          const nextDate = availableDates.find((date) => branch === "SN" || date.iso >= MTY_SUR_OPENING_DATE)?.iso ?? "";
+                          setScheduleBranch(branch);
+                          setScheduleDate(nextDate);
+                          if (nextDate) void loadScheduleAvailability(branch, nextDate);
+                        }}>
+                          <option value="SN">San Nicolás</option>
+                          <option value="MTY_SUR">Monterrey Sur</option>
+                        </select>
+                      </label>
+                      <label>Fecha
+                        <select value={scheduleDate} onChange={(event) => {
+                          setScheduleDate(event.target.value);
+                          void loadScheduleAvailability(scheduleBranch, event.target.value);
+                        }}>
+                          {scheduleDates.map((date) => <option key={date.iso} value={date.iso}>{date.label}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="scheduler-times">
+                      <strong>Horario</strong>
+                      {loadingSchedule ? <p className="copy compact-copy">Consultando la agenda...</p> : (
+                        <div className="time-grid">
+                          {scheduleSlots.map((slot) => <button className={scheduleTime === slot.time ? "active" : ""} disabled={!slot.available} key={slot.time} onClick={() => setScheduleTime(slot.time)} type="button">{slot.label}</button>)}
+                        </div>
+                      )}
+                    </div>
+                    {scheduleNotice && <p className="error scheduler-notice">{scheduleNotice}</p>}
+                    <button className="primary scheduler-confirm" disabled={!scheduleTime || (!activePatient && !scheduleName.trim()) || savingAppointment} onClick={createAppointment} type="button"><CheckCircle2 size={17} />{savingAppointment ? "Creando cita" : "Confirmar y preparar mensaje"}</button>
+                  </section>
+                )}
 
                 {showDetails && (
                   <section className="conversation-details-panel">
@@ -499,7 +668,7 @@ export function WhatsAppInbox() {
                   {QUICK_REPLIES.map((reply) => <button key={reply.label} onClick={() => setDraft(reply.text(firstName(activePatient?.full_name)))} type="button">{reply.label}</button>)}
                 </div>
                 <div className="composer">
-                  {notice && <p className={notice === "Seguimiento guardado." ? "success-note composer-notice" : "error composer-notice"}>{notice}</p>}
+                  {notice && <p className={notice === "Seguimiento guardado." || notice.startsWith("Cita creada") ? "success-note composer-notice" : "error composer-notice"}>{notice}</p>}
                   <textarea aria-label="Escribe una respuesta" placeholder="Escribe una respuesta..." value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} />
                   <button className="primary send-button" disabled={!draft.trim() || sending} onClick={sendMessage} type="button"><Send size={17} />{sending ? "Enviando" : "Enviar"}</button>
                 </div>
