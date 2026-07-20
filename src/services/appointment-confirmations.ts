@@ -1,4 +1,9 @@
-import { getAppointmentTemplateNames, sendCloudWhatsAppTemplate, sendCloudWhatsAppText } from "@/lib/meta-whatsapp";
+import {
+  getAppointmentTemplateNames,
+  isCloudWhatsAppOutboundEnabled,
+  sendCloudWhatsAppTemplate,
+  sendCloudWhatsAppText
+} from "@/lib/meta-whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { releaseGoogleCalendarEventAtEight, syncGoogleCalendarEventStatus } from "@/services/google-calendar";
 import type { AppointmentRow } from "@/types/appointments";
@@ -297,6 +302,9 @@ async function retryUnsentReleaseNotices(date: string, branches: Map<string, Bra
 export async function runAppointmentConfirmationCycle(now = new Date()) {
   const local = getMonterreyNow(now);
   const actions = getActions(now);
+  if (!isCloudWhatsAppOutboundEnabled()) {
+    return { sent: 0, released: 0, skipped: 0, errors: 0, actions, paused: true };
+  }
   const branches = await loadBranches();
   const result = { sent: 0, released: 0, skipped: 0, errors: 0, actions };
 
@@ -349,6 +357,7 @@ function normalizeReply(value: string) {
 }
 
 async function sendReplyAndSave(appointment: AppointmentRow, body: string) {
+  if (!isCloudWhatsAppOutboundEnabled()) return;
   const sentAt = new Date().toISOString();
   const metaMessageId = await sendCloudWhatsAppText(appointment.whatsapp, body);
   await saveOutboundMessage(appointment, metaMessageId, body, sentAt);

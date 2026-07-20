@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
+import { isCloudWhatsAppOutboundEnabled } from "@/lib/meta-whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -7,6 +8,12 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   if (!await getAuthenticatedAdminEmail(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  if (!isCloudWhatsAppOutboundEnabled()) {
+    return NextResponse.json({
+      error: "Los mensajes están pausados hasta resolver el nombre de Más Sano en Meta."
+    }, { status: 423 });
   }
 
   const payload = await request.json().catch(() => ({})) as { conversationId?: string; body?: string };

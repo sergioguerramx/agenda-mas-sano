@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import {
   getIncomingMessageBody,
+  isCloudWhatsAppOutboundEnabled,
   normalizeCloudWhatsApp,
   unixSecondsToIso,
   verifyMetaSignature
@@ -118,7 +119,7 @@ async function sendAutomaticMetaAdWelcome(
   message: MetaMessage,
   saved: { conversationId: string; whatsapp: string }
 ) {
-  if (!message.id || !comesFromClickToWhatsAppAd(message)) return;
+  if (!isCloudWhatsAppOutboundEnabled() || !message.id || !comesFromClickToWhatsAppAd(message)) return;
 
   const client = createSupabaseServiceRoleClient();
   const { count, error: countError } = await client

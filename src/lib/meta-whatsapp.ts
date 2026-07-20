@@ -23,7 +23,15 @@ function getCloudWhatsAppConfig() {
   };
 }
 
+export function isCloudWhatsAppOutboundEnabled() {
+  return (process.env.WHATSAPP_OUTBOUND_ENABLED ?? "false").trim().toLowerCase() === "true";
+}
+
 async function sendCloudWhatsAppPayload(payload: Record<string, unknown>) {
+  if (!isCloudWhatsAppOutboundEnabled()) {
+    throw new Error("Los mensajes están pausados hasta resolver el nombre de Más Sano en Meta.");
+  }
+
   const config = getCloudWhatsAppConfig();
   if (!config.accessToken || !config.phoneNumberId) {
     throw new Error("El número de campañas todavía no está completamente conectado.");
