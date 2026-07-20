@@ -6,7 +6,8 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!await getAuthenticatedMessagingEmail(request)) {
+  const operatorEmail = await getAuthenticatedMessagingEmail(request);
+  if (!operatorEmail) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -81,9 +82,10 @@ export async function POST(request: NextRequest) {
       message_type: "text",
       body,
       delivery_status: 1,
-      sent_at: sentAt
+      sent_at: sentAt,
+      sent_by_email: operatorEmail.toLowerCase()
     })
-    .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at")
+    .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email")
     .single();
 
   if (saveError) {

@@ -88,6 +88,7 @@ type InboxMessage = {
   sent_at: string;
   delivered_at: string | null;
   read_at: string | null;
+  sent_by_email: string | null;
 };
 
 type PatientMatch = {
@@ -182,6 +183,14 @@ function deliveryLabel(message: InboxMessage) {
   if (message.delivery_status === 1) return "Enviado";
   if (message.delivery_status === -1) return "No entregado";
   return "Procesando";
+}
+
+function responderLabel(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (normalized === "ms.suc.puentes@gmail.com") return "San Nicolás";
+  if (normalized === "ms.suc.mty@gmail.com") return "Monterrey Sur";
+  if (isAllowedAdminEmail(normalized)) return "Administrador";
+  return normalized;
 }
 
 function historyStatus(item: PatientHistory) {
@@ -292,7 +301,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     if (teamMode) {
       const { data: messageData } = await supabase
         .from("whatsapp_messages")
-        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at")
+        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: true });
       setMessages((messageData ?? []) as InboxMessage[]);
@@ -306,7 +315,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     const [{ data: messageData }, { data: patientData }, { data: branchData }] = await Promise.all([
       supabase
         .from("whatsapp_messages")
-        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at")
+        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: true }),
       supabase
@@ -706,7 +715,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
                 )}
 
                 <div className="message-list" ref={messageListRef}>
-                  {messages.map((message) => <div className={`message-bubble ${message.direction === 2 ? "outbound" : "inbound"}`} key={message.id}><p>{message.body || "Mensaje sin texto"}</p><small>{formatDateTime(message.sent_at)} {deliveryLabel(message)}</small></div>)}
+                  {messages.map((message) => <div className={`message-bubble ${message.direction === 2 ? "outbound" : "inbound"}`} key={message.id}><p>{message.body || "Mensaje sin texto"}</p><small>{formatDateTime(message.sent_at)} {deliveryLabel(message)}</small>{message.direction === 2 && message.sent_by_email && <small>Respondió: {responderLabel(message.sent_by_email)}</small>}</div>)}
                   {messages.length === 0 && <p className="copy empty-inbox">Todavía no hay mensajes guardados.</p>}
                 </div>
 
