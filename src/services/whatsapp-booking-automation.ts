@@ -244,7 +244,7 @@ async function sendBranchQuestion(client: SupabaseClient, conversation: Conversa
   await sendButtons(client, conversation, includeWelcome ? welcomeMessage() : "Selecciona la sucursal que prefieras:", [
     { id: "book_branch_sn", title: "📍 San Nicolás" },
     { id: "book_branch_mty_sur", title: "📍 Monterrey Sur" },
-    { id: "book_locations", title: "🗺️ Ver ubicaciones" }
+    { id: "book_question", title: "💬 Tengo una duda" }
   ]);
 }
 
@@ -531,6 +531,10 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
   const reply = normalize(message.body);
 
   if (conversation.automation_step === "awaiting_branch") {
+    if (selectionId === "book_question" || reply.includes("tengo una duda") || reply.includes("hablar con una asesora")) {
+      await handOffToTeam(client, conversation);
+      return true;
+    }
     if (selectionId === "book_locations" || reply.includes("ver ubicaciones") || reply === "ubicaciones") {
       await sendText(client, conversation, locationsMessage());
       await sendBranchQuestion(client, conversation, false);
