@@ -153,7 +153,8 @@ function confirmationCopy(appointment: AppointmentRow, branchName: string, stage
 async function claimAndSendConfirmation(
   appointment: AppointmentRow,
   branch: BranchRow,
-  requestedStage: ConfirmationStage
+  requestedStage: ConfirmationStage,
+  deliveryMode: "template" | "text" = "template"
 ) {
   const client = createSupabaseServiceRoleClient();
   const stage: ConfirmationStage = requestedStage === "second" && !appointment.confirmation_first_sent_at
@@ -181,12 +182,14 @@ async function claimAndSendConfirmation(
     const useGenericTemplate = stage === "second" && isSaturdayAppointment;
     const body = confirmationCopy(appointment, branch.name, useGenericTemplate ? "first" : stage);
     const templateName = stage === "first" || useGenericTemplate ? templates.first : templates.second;
-    const metaMessageId = await sendCloudWhatsAppTemplate(
-      appointment.whatsapp,
-      templateName,
-      templates.language,
-      [appointment.first_name, formatDate(appointment.appointment_date), formatTime(appointment.appointment_time), branch.name]
-    );
+    const metaMessageId = deliveryMode === "text"
+      ? await sendCloudWhatsAppText(appointment.whatsapp, body)
+      : await sendCloudWhatsAppTemplate(
+        appointment.whatsapp,
+        templateName,
+        templates.language,
+        [appointment.first_name, formatDate(appointment.appointment_date), formatTime(appointment.appointment_time), branch.name]
+      );
     await saveOutboundMessage(appointment, metaMessageId, body, claimTime);
     return "sent";
   } catch (error) {
@@ -387,7 +390,7 @@ export async function sendTestAppointmentConfirmation(conversationId: string) {
   const branch = appointment.branch_code ? branches.get(appointment.branch_code) : null;
   if (!branch) throw new Error("No se encontró la sucursal de la cita de prueba.");
 
-  const status = await claimAndSendConfirmation(appointment, branch, "first");
+  const status = await claimAndSendConfirmation(appointment, branch, "first", "text");
   if (status !== "sent") throw new Error("La confirmación de prueba ya había sido enviada.");
 
   return {
