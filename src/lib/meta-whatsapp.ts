@@ -97,6 +97,35 @@ export async function sendCloudWhatsAppReplyButtons(
   });
 }
 
+export async function sendCloudWhatsAppList(
+  to: string,
+  body: string,
+  buttonLabel: string,
+  rows: Array<{ id: string; title: string; description?: string }>
+) {
+  return sendCloudWhatsAppPayload({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: to.replace(/\D/g, ""),
+    type: "interactive",
+    interactive: {
+      type: "list",
+      body: { text: body },
+      action: {
+        button: buttonLabel,
+        sections: [{
+          title: "Horarios disponibles",
+          rows: rows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            ...(row.description ? { description: row.description } : {})
+          }))
+        }]
+      }
+    }
+  });
+}
+
 export async function sendCloudWhatsAppTemplate(
   to: string,
   templateName: string,
@@ -170,6 +199,17 @@ export function getIncomingMessageBody(message: Record<string, unknown>) {
   };
 
   return labels[type] ?? "Mensaje recibido";
+}
+
+export function getIncomingMessageSelectionId(message: Record<string, unknown>) {
+  const interactive = message.interactive as
+    | { button_reply?: { id?: string }; list_reply?: { id?: string } }
+    | undefined;
+
+  if (message.type !== "interactive") return "";
+  return interactive?.button_reply?.id?.trim()
+    || interactive?.list_reply?.id?.trim()
+    || "";
 }
 
 export function unixSecondsToIso(value: string | number | undefined) {
