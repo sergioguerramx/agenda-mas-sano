@@ -499,9 +499,10 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
   const conversation = data as ConversationRow | null;
   if (!conversation || conversation.workflow_status === "no_contactar") return false;
 
-  const shouldStart = Boolean(message.fromAd || isTestStartMessage(message.body));
+  const restartRequested = isTestStartMessage(message.body);
+  const shouldStart = Boolean(message.fromAd || restartRequested);
   if (!conversation.automation_step && !shouldStart) return false;
-  if (!conversation.automation_step) {
+  if (!conversation.automation_step || restartRequested) {
     const now = new Date().toISOString();
     await updateAutomation(client, conversation.id, "awaiting_branch", {}, {
       workflow_status: "interesado",
