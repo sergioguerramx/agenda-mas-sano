@@ -222,6 +222,7 @@ function welcomeMessage() {
       "✅ Seguimiento y asesoría por WhatsApp"
     ].join("\n"),
     `📌 Las sesiones de seguimiento son quincenales. Si asistes cada 15 días, tu precio se mantiene en $${price}.`,
+    "📅 Tenemos disponibilidad para agendar a partir del 3 de agosto.",
     "¿En cuál sucursal te gustaría agendar?"
   ].join("\n\n");
 }
