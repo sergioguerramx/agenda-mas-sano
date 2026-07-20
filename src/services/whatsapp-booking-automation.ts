@@ -117,6 +117,14 @@ function addDays(dateIso: string, days: number) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+function buildBranchAvailableDates(branchCode?: BranchCode, now = new Date()) {
+  const today = getMonterreyToday();
+  if (branchCode === "MTY_SUR" && today < MTY_SUR_OPENING_DATE) {
+    return buildAvailableDates(new Date(`${MTY_SUR_OPENING_DATE}T12:00:00Z`));
+  }
+  return buildAvailableDates(now);
+}
+
 function splitName(value: string) {
   const parts = value.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   return { firstName: parts.shift() ?? "", lastName: parts.join(" ") };
@@ -222,7 +230,6 @@ function welcomeMessage() {
       "✅ Seguimiento y asesoría por WhatsApp"
     ].join("\n"),
     `📌 Las sesiones de seguimiento son quincenales. Si asistes cada 15 días, tu precio se mantiene en $${price}.`,
-    "📅 Tenemos disponibilidad para agendar a partir del 3 de agosto.",
     "¿En cuál sucursal te gustaría agendar?"
   ].join("\n\n");
 }
@@ -255,9 +262,9 @@ function branchFromReply(body: string, selectionId: string) {
   return null;
 }
 
-function parseDateAndShift(body: string) {
+function parseDateAndShift(body: string, branchCode?: BranchCode) {
   const reply = normalize(body);
-  const availableDates = buildAvailableDates(new Date());
+  const availableDates = buildBranchAvailableDates(branchCode);
   let date: string | undefined;
   let shift: Shift | undefined;
 
@@ -539,7 +546,9 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
     await sendText(
       client,
       conversation,
-      `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
+      branchCode === "MTY_SUR"
+        ? `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n📅 Tenemos disponibilidad a partir del lunes 3 de agosto.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
+        : `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
     );
     return true;
   }
@@ -549,12 +558,15 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
       ? { date: context.date, shift: "morning" as const }
       : selectionId === "book_shift_afternoon"
         ? { date: context.date, shift: "afternoon" as const }
-        : parseDateAndShift(message.body);
+        : parseDateAndShift(message.body, context.branchCode);
     const date = parsed.date ?? context.date;
     const shift = parsed.shift ?? context.shift;
-    const validDate = date ? buildAvailableDates(new Date()).find((item) => item.iso === date && !item.closed) : null;
+    const validDate = date ? buildBranchAvailableDates(context.branchCode).find((item) => item.iso === date && !item.closed) : null;
     if (!date || !validDate) {
-      await retryOrHandOff(client, conversation, "awaiting_day_shift", { ...context, shift }, "Indícanos un día disponible dentro de los próximos 15 días. Por ejemplo: viernes por la tarde.");
+      const retryMessage = context.branchCode === "MTY_SUR"
+        ? "La disponibilidad de Monterrey Sur comienza el lunes 3 de agosto. Indícanos un día posterior; por ejemplo: jueves por la tarde."
+        : "Indícanos un día disponible dentro de los próximos 15 días. Por ejemplo: viernes por la tarde.";
+      await retryOrHandOff(client, conversation, "awaiting_day_shift", { ...context, shift }, retryMessage);
       return true;
     }
     if (!shift) {
