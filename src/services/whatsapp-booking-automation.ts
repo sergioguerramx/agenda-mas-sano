@@ -354,6 +354,10 @@ async function showAvailableSlots(
   }));
   if (hasMore) rows.push({ id: "book_more_times", title: "Más horarios", description: "Mostrar otras opciones" });
 
+  const availabilityMessage = context.branchCode === "SN"
+    ? `Para el ${formatDisplayDate(context.date)} te atenderemos en ${getBranchLocation("SN", context.date).label} 💚\n\nEstos son los horarios disponibles:`
+    : `Para el ${formatDisplayDate(context.date)} tenemos estos horarios disponibles:`;
+
   await updateAutomation(client, conversation.id, "awaiting_time", {
     ...context,
     slotOffset: offset,
@@ -362,7 +366,7 @@ async function showAvailableSlots(
   await sendList(
     client,
     conversation,
-    `Para el ${formatDisplayDate(context.date)} tenemos estos horarios disponibles:`,
+    availabilityMessage,
     rows
   );
 }
