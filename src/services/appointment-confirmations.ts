@@ -11,6 +11,7 @@ import type { AppointmentRow } from "@/types/appointments";
 const TIME_ZONE = "America/Monterrey";
 const AUTOMATION_START_DATE = "2026-08-03";
 const ACTIVE_BRANCHES = ["SN", "MTY_SUR"];
+const TEST_WHATSAPP = "+528132469930";
 const APPOINTMENT_SELECT = [
   "id", "first_name", "last_name", "whatsapp", "appointment_date", "appointment_time", "status",
   "google_calendar_event_id", "brand", "modality", "service", "origin", "branch_code",
@@ -133,7 +134,8 @@ async function saveOutboundMessage(appointment: AppointmentRow, metaMessageId: s
     message_type: "template",
     body,
     delivery_status: 1,
-    sent_at: sentAt
+    sent_at: sentAt,
+    sent_by_email: "automatizacion"
   });
   if (messageError && messageError.code !== "23505") throw messageError;
 }
@@ -344,6 +346,55 @@ export async function runAppointmentConfirmationCycle(now = new Date()) {
   }
 
   return result;
+}
+
+export async function sendTestAppointmentConfirmation(conversationId: string) {
+  if (!isCloudWhatsAppOutboundEnabled()) {
+    throw new Error("Los mensajes de WhatsApp no están habilitados.");
+  }
+
+  const client = createSupabaseServiceRoleClient();
+  const { data: conversation } = await client
+    .from("whatsapp_conversations")
+    .select("whatsapp")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (!conversation || conversation.whatsapp !== TEST_WHATSAPP) {
+    throw new Error("La prueba inmediata solo está permitida con el número de INCAIN.");
+  }
+
+  const today = getMonterreyNow(new Date()).date;
+  const { data, error } = await client
+    .from("appointments")
+    .select(APPOINTMENT_SELECT)
+    .eq("whatsapp", TEST_WHATSAPP)
+    .eq("status", "pending")
+    .gte("appointment_date", today)
+    .is("confirmation_response", null)
+    .is("confirmation_first_sent_at", null)
+    .order("appointment_date", { ascending: true })
+    .order("appointment_time", { ascending: true })
+    .limit(2);
+  if (error) throw error;
+  if (!data || data.length !== 1) {
+    throw new Error(data?.length ? "Hay más de una cita de prueba pendiente." : "No encontramos la cita de prueba pendiente.");
+  }
+
+  const appointment = data[0] as unknown as AppointmentRow;
+  const branches = await loadBranches();
+  const branch = appointment.branch_code ? branches.get(appointment.branch_code) : null;
+  if (!branch) throw new Error("No se encontró la sucursal de la cita de prueba.");
+
+  const status = await claimAndSendConfirmation(appointment, branch, "first");
+  if (status !== "sent") throw new Error("La confirmación de prueba ya había sido enviada.");
+
+  return {
+    appointmentId: appointment.id,
+    appointmentDate: appointment.appointment_date,
+    appointmentTime: appointment.appointment_time,
+    branchName: branch.name
+  };
 }
 
 function normalizeReply(value: string) {

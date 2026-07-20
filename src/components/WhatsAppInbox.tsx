@@ -189,6 +189,7 @@ function responderLabel(email: string) {
   const normalized = email.trim().toLowerCase();
   if (normalized === "ms.suc.puentes@gmail.com") return "San Nicolás";
   if (normalized === "ms.suc.mty@gmail.com") return "Monterrey Sur";
+  if (normalized === "automatizacion") return "Automatización";
   if (isAllowedAdminEmail(normalized)) return "Administrador";
   return normalized;
 }
@@ -262,6 +263,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
   const [sending, setSending] = useState(false);
+  const [testingConfirmation, setTestingConfirmation] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const messageListRef = useRef<HTMLDivElement | null>(null);
 
@@ -503,6 +505,27 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     return response;
   }
 
+  async function sendConfirmationTest() {
+    if (!selected || testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/test-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: selected.id })
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo enviar la prueba.");
+      setNotice("Confirmación de prueba enviada a INCAIN.");
+      if (client) await loadConversation(client, selected);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo enviar la prueba.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
   async function loadScheduleAvailability(branch: "SN" | "MTY_SUR", date: string) {
     if (!date) return;
     setLoadingSchedule(true);
@@ -641,6 +664,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
 
                 <div className="chat-action-bar">
                   <button className={`secondary mini-action ${showScheduler ? "active" : ""}`} onClick={openScheduler} type="button"><CalendarPlus size={16} />Agendar cita</button>
+                  {selected.whatsapp === "+528132469930" && <button className="secondary mini-action" disabled={testingConfirmation} onClick={sendConfirmationTest} type="button"><Send size={16} />{testingConfirmation ? "Enviando prueba" : "Probar confirmación ahora"}</button>}
                   {!teamMode && <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => { setShowScheduler(false); setShowDetails((value) => !value); }} type="button"><UserRound size={16} />Ficha y seguimiento</button>}
                   {!teamMode && <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer">Abrir agenda pública</a>}
                 </div>
