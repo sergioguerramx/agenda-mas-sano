@@ -550,7 +550,7 @@ export function WhatsAppInbox() {
         <section className="card inbox-layout">
           <aside className={`inbox-sidebar ${selected ? "has-selection" : ""}`}>
             <div className="inbox-sidebar-header">
-              <div><strong>Conversaciones</strong><p className="copy inbox-number">Número de campañas: 81 2576 1735</p></div>
+              <div><strong>Conversaciones</strong><p className="copy inbox-number">Número de campañas: 81 8693 5634</p></div>
               <button className="icon-button" onClick={() => client && loadConversations(client)} aria-label="Actualizar conversaciones" type="button"><RefreshCw size={17} /></button>
             </div>
             <div className="inbox-filters">
