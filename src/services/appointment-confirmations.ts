@@ -369,6 +369,7 @@ export async function sendTestAppointmentConfirmation(conversationId: string) {
     .from("appointments")
     .select(APPOINTMENT_SELECT)
     .eq("whatsapp", TEST_WHATSAPP)
+    .ilike("first_name", "PRUEBA%")
     .eq("status", "pending")
     .gte("appointment_date", today)
     .is("confirmation_response", null)
