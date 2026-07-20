@@ -2,7 +2,19 @@
   "crons": [
     {
       "path": "/api/cron/appointment-confirmations",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-confirmations",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-confirmations",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-confirmations",
+      "schedule": "0 18 * * *"
     }
   ]
 }
