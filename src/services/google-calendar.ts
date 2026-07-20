@@ -436,7 +436,8 @@ export async function syncGoogleCalendarEventStatus(
 
 export async function releaseGoogleCalendarEventAtEight(
   appointment: AppointmentRow,
-  calendarIdOverride?: string
+  calendarIdOverride?: string,
+  reason: "no_confirmo" | "reagendar" | "cancelo" = "no_confirmo"
 ): Promise<CalendarResult> {
   if (!appointment.google_calendar_event_id) {
     return { status: "skipped", reason: "La cita no tiene evento relacionado." };
@@ -451,7 +452,12 @@ export async function releaseGoogleCalendarEventAtEight(
     status: "cancelled" as const
   };
   const eventBody = getEventBody(releasedAppointment, "cancelled");
-  eventBody.summary = `NO CONFIRMÓ - ${getAppointmentSummary(appointment, "pending")}`;
+  const labels = {
+    no_confirmo: "NO CONFIRMÓ",
+    reagendar: "REAGENDAR",
+    cancelo: "CANCELÓ"
+  };
+  eventBody.summary = `${labels[reason]} - ${getAppointmentSummary(appointment, "pending")}`;
 
   const body = await callGoogleCalendar(`/events/${encodeURIComponent(appointment.google_calendar_event_id)}`, {
     method: "PATCH",

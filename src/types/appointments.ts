@@ -44,7 +44,7 @@ export type AppointmentRow = {
   branch_code?: "SN" | "MTY_SUR" | null;
   confirmation_first_sent_at?: string | null;
   confirmation_second_sent_at?: string | null;
-  confirmation_response?: "confirmed" | "reprogram_requested" | null;
+  confirmation_response?: "confirmed" | "reprogram_requested" | "cancelled" | null;
   confirmation_response_at?: string | null;
   confirmation_released_at?: string | null;
   confirmation_release_notice_sent_at?: string | null;

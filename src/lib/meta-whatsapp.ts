@@ -60,7 +60,7 @@ export function getAppointmentTemplateNames() {
     first: (process.env.META_WHATSAPP_CONFIRMATION_TEMPLATE ?? "mas_sano_confirmacion_cita").trim(),
     second: (process.env.META_WHATSAPP_SECOND_CONFIRMATION_TEMPLATE ?? "mas_sano_segunda_confirmacion").trim(),
     released: (process.env.META_WHATSAPP_RELEASED_TEMPLATE ?? "mas_sano_cita_liberada").trim(),
-    language: (process.env.META_WHATSAPP_TEMPLATE_LANGUAGE ?? "es_MX").trim()
+    language: (process.env.META_WHATSAPP_TEMPLATE_LANGUAGE ?? "es").trim()
   };
 }
 
@@ -71,6 +71,29 @@ export async function sendCloudWhatsAppText(to: string, body: string) {
     to: to.replace(/\D/g, ""),
     type: "text",
     text: { body, preview_url: false }
+  });
+}
+
+export async function sendCloudWhatsAppReplyButtons(
+  to: string,
+  body: string,
+  buttons: Array<{ id: string; title: string }>
+) {
+  return sendCloudWhatsAppPayload({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: to.replace(/\D/g, ""),
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: body },
+      action: {
+        buttons: buttons.map((button) => ({
+          type: "reply",
+          reply: button
+        }))
+      }
+    }
   });
 }
 

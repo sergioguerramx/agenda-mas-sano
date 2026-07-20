@@ -1,6 +1,7 @@
 import {
   getAppointmentTemplateNames,
   isCloudWhatsAppOutboundEnabled,
+  sendCloudWhatsAppReplyButtons,
   sendCloudWhatsAppTemplate,
   sendCloudWhatsAppText
 } from "@/lib/meta-whatsapp";
@@ -12,6 +13,11 @@ const TIME_ZONE = "America/Monterrey";
 const AUTOMATION_START_DATE = "2026-08-03";
 const ACTIVE_BRANCHES = ["SN", "MTY_SUR"];
 const TEST_WHATSAPP = "+528132469930";
+const CONFIRMATION_BUTTONS = [
+  { id: "confirmar_cita", title: "Sí, confirmo" },
+  { id: "reagendar_cita", title: "Quiero reagendar" },
+  { id: "cancelar_cita", title: "No podré asistir" }
+];
 const APPOINTMENT_SELECT = [
   "id", "first_name", "last_name", "whatsapp", "appointment_date", "appointment_time", "status",
   "google_calendar_event_id", "brand", "modality", "service", "origin", "branch_code",
@@ -145,16 +151,16 @@ function confirmationCopy(appointment: AppointmentRow, branchName: string, stage
   const date = formatDate(appointment.appointment_date);
   const time = formatTime(appointment.appointment_time);
   if (stage === "second") {
-    return `Hola ${name}. Aún no recibimos confirmación para tu cita del ${date}, a las ${time} en Más Sano ${branchName}. Para conservar tu horario, confírmanos hoy.`;
+    return `Hola ${name}. Aún no recibimos confirmación para tu cita del ${date} a las ${time} en ${branchName}. Para conservar tu horario, selecciona una opción:`;
   }
-  return `Hola ${name}. Te escribimos de Más Sano para confirmar tu cita de ${date} a las ${time} en ${branchName}. ¿Confirmas tu asistencia?`;
+  return `Hola ${name}. Te escribimos de Más Sano para confirmar tu cita del ${date} a las ${time} en ${branchName}. Para conservar tu horario, selecciona una opción:`;
 }
 
 async function claimAndSendConfirmation(
   appointment: AppointmentRow,
   branch: BranchRow,
   requestedStage: ConfirmationStage,
-  deliveryMode: "template" | "text" = "template"
+  deliveryMode: "template" | "buttons" = "template"
 ) {
   const client = createSupabaseServiceRoleClient();
   const stage: ConfirmationStage = requestedStage === "second" && !appointment.confirmation_first_sent_at
@@ -182,8 +188,8 @@ async function claimAndSendConfirmation(
     const useGenericTemplate = stage === "second" && isSaturdayAppointment;
     const body = confirmationCopy(appointment, branch.name, useGenericTemplate ? "first" : stage);
     const templateName = stage === "first" || useGenericTemplate ? templates.first : templates.second;
-    const metaMessageId = deliveryMode === "text"
-      ? await sendCloudWhatsAppText(appointment.whatsapp, body)
+    const metaMessageId = deliveryMode === "buttons"
+      ? await sendCloudWhatsAppReplyButtons(appointment.whatsapp, body, CONFIRMATION_BUTTONS)
       : await sendCloudWhatsAppTemplate(
         appointment.whatsapp,
         templateName,
@@ -390,7 +396,7 @@ export async function sendTestAppointmentConfirmation(conversationId: string) {
   const branch = appointment.branch_code ? branches.get(appointment.branch_code) : null;
   if (!branch) throw new Error("No se encontró la sucursal de la cita de prueba.");
 
-  const status = await claimAndSendConfirmation(appointment, branch, "first", "text");
+  const status = await claimAndSendConfirmation(appointment, branch, "first", "buttons");
   if (status !== "sent") throw new Error("La confirmación de prueba ya había sido enviada.");
 
   return {
@@ -411,6 +417,72 @@ function normalizeReply(value: string) {
     .toLowerCase();
 }
 
+type ConfirmationIntent = "confirm" | "reschedule" | "cancel";
+
+function getConfirmationIntent(value: string): ConfirmationIntent | null {
+  const reply = normalizeReply(value);
+  const delayed = [
+    "mas tarde", "al rato", "luego", "despues", "en un momento", "te aviso",
+    "dejame revisar", "aun no", "todavia no", "tal vez", "puede ser"
+  ].some((phrase) => reply.includes(phrase));
+  if (delayed) return null;
+
+  const confirmations = new Set([
+    "si", "si confirmo", "confirmo", "confirmado", "confirmada", "si asistire",
+    "si voy", "ahi estare", "claro que si", "cuenten conmigo"
+  ]);
+  const reschedules = new Set([
+    "quiero reagendar", "necesito reagendar", "reagendar", "quiero cambiar",
+    "cambiar horario", "necesito cambiar la cita"
+  ]);
+  const cancellations = new Set([
+    "no podre asistir", "no asistire", "no voy a poder", "cancelo", "cancelar cita",
+    "quiero cancelar"
+  ]);
+
+  if (confirmations.has(reply)) return "confirm";
+  if (reschedules.has(reply)) return "reschedule";
+  if (cancellations.has(reply)) return "cancel";
+  return null;
+}
+
+async function releaseFromPatientReply(
+  appointment: AppointmentRow,
+  response: "reprogram_requested" | "cancelled",
+  responseAt: string
+) {
+  const client = createSupabaseServiceRoleClient();
+  const originalTime = appointment.appointment_time;
+
+  await client
+    .from("patient_appointment_history")
+    .update({ original_scheduled_at: `${appointment.appointment_date}T${originalTime.slice(0, 5)}:00-06:00` })
+    .eq("legacy_appointment_id", appointment.id)
+    .is("original_scheduled_at", null);
+
+  await client.from("appointments").update({
+    appointment_time: "08:00",
+    status: "cancelled",
+    confirmation_response: response,
+    confirmation_response_at: responseAt,
+    confirmation_original_time: originalTime,
+    confirmation_released_at: responseAt,
+    confirmation_release_notice_sent_at: responseAt,
+    confirmation_last_error: null
+  }).eq("id", appointment.id);
+
+  const { data: branch } = await client
+    .from("branches")
+    .select("calendar_email")
+    .eq("code", appointment.branch_code ?? "SN")
+    .maybeSingle();
+  await releaseGoogleCalendarEventAtEight(
+    appointment,
+    branch?.calendar_email ?? undefined,
+    response === "cancelled" ? "cancelo" : "reagendar"
+  );
+}
+
 async function sendReplyAndSave(appointment: AppointmentRow, body: string) {
   if (!isCloudWhatsAppOutboundEnabled()) return;
   const sentAt = new Date().toISOString();
@@ -423,10 +495,8 @@ export async function handleAppointmentConfirmationReply(
   incomingBody: string,
   replyToMetaMessageId?: string
 ) {
-  const reply = normalizeReply(incomingBody);
-  const confirms = reply === "si" || reply.includes("confirmo") || reply.includes("confirmar");
-  const reschedules = reply === "no" || reply.includes("reagendar") || reply.includes("reprogram") || reply.includes("cambiar") || reply.includes("cancel");
-  if (!confirms && !reschedules) return false;
+  const intent = getConfirmationIntent(incomingBody);
+  if (!intent) return false;
 
   const client = createSupabaseServiceRoleClient();
   const today = getMonterreyNow(new Date()).date;
@@ -475,11 +545,11 @@ export async function handleAppointmentConfirmationReply(
 
   const isReleased = appointment.status === "cancelled" && Boolean(appointment.confirmation_released_at);
   if (appointment.confirmation_response || (appointment.status !== "pending" && !isReleased)) return false;
-  if (confirms && appointment.status !== "pending") return false;
+  if (intent === "confirm" && appointment.status !== "pending") return false;
 
   const responseAt = new Date().toISOString();
 
-  if (confirms) {
+  if (intent === "confirm") {
     await client.from("appointments").update({
       status: "confirmed",
       confirmation_response: "confirmed",
@@ -504,17 +574,17 @@ export async function handleAppointmentConfirmationReply(
     return true;
   }
 
-  await client.from("appointments").update({
-    confirmation_response: "reprogram_requested",
-    confirmation_response_at: responseAt
-  }).eq("id", appointment.id);
+  const response = intent === "cancel" ? "cancelled" : "reprogram_requested";
+  await releaseFromPatientReply(appointment, response, responseAt);
   await client.from("whatsapp_conversations").update({
     workflow_status: "seguimiento",
     updated_at: responseAt
   }).eq("whatsapp", whatsapp);
   await sendReplyAndSave(
     appointment,
-    `Claro, ${appointment.first_name}. Te ayudamos a cambiar tu cita. En breve revisamos contigo un nuevo horario.`
+    intent === "cancel"
+      ? `Gracias por avisarnos, ${appointment.first_name}. Tu horario quedó liberado. Cuando desees agendar nuevamente, quedamos a tus órdenes.`
+      : `Claro, ${appointment.first_name}. Liberamos tu horario actual y en breve te ayudamos a elegir una nueva cita.`
   );
   return true;
 }
