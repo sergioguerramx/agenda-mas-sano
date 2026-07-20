@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const supabase = createSupabaseServiceRoleClient();
     const { data: currentAppointment, error: loadError } = await supabase
       .from("appointments")
-      .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, created_at, updated_at")
+      .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, brand, modality, service, origin, branch_code, created_at, updated_at")
       .eq("id", payload.id)
       .maybeSingle();
 
@@ -92,7 +92,16 @@ export async function POST(request: Request) {
     let calendarStatus = "skipped";
 
     try {
-      const calendarResult = await syncGoogleCalendarEventStatus({ ...appointment, status: payload.status }, payload.status);
+      const { data: branch } = await supabase
+        .from("branches")
+        .select("calendar_email")
+        .eq("code", appointment.branch_code ?? "SN")
+        .maybeSingle();
+      const calendarResult = await syncGoogleCalendarEventStatus(
+        { ...appointment, status: payload.status },
+        payload.status,
+        branch?.calendar_email ?? undefined
+      );
       calendarStatus = calendarResult.status;
 
       if (payload.status === "cancelled" && appointment.google_calendar_event_id) {

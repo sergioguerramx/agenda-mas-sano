@@ -199,16 +199,19 @@ function isYoSoySanoAppointment(appointment: AppointmentRow) {
   return appointment.brand === "yo_soy_sano" || appointment.origin === "yosoysano";
 }
 
-function getAppointmentSummary(appointment: AppointmentRow) {
+function getAppointmentSummary(appointment: AppointmentRow, status: AppointmentStatus = appointment.status) {
   const patientName = getPatientName(appointment);
+  const marker = status === "confirmed" ? "✔️" : status === "completed" ? "*" : "";
 
   if (isYoSoySanoAppointment(appointment)) {
-    return appointment.service === "paquete_1199"
+    const title = appointment.service === "paquete_1199"
       ? `YSS PAQUETE - ${patientName}`
       : `YSS ONLINE $399 - ${patientName}`;
+    return `${marker}${title}`;
   }
 
-  return `PX $399 - ${patientName}`;
+  const price = appointment.service === "sesion_integral_449" ? "$449" : "$399";
+  return `${marker}PX ${price} - ${patientName}`;
 }
 
 function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = appointment.status) {
@@ -218,7 +221,7 @@ function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = a
   const isYss = isYoSoySanoAppointment(appointment);
 
   return {
-    summary: getAppointmentSummary(appointment),
+    summary: getAppointmentSummary(appointment, status),
     description: [
       `Paciente: ${patientName}`,
       `WhatsApp: ${appointment.whatsapp}`,
@@ -397,21 +400,25 @@ export async function createGoogleCalendarEvent(
 
   const body = await callGoogleCalendar("/events", {
     method: "POST",
-    body: JSON.stringify(getEventBody(appointment, "pending"))
+    body: JSON.stringify(getEventBody(appointment, appointment.status))
   }, undefined, calendarIdOverride) as GoogleCalendarEventResponse;
 
   return { status: "created", eventId: body.id };
 }
 
-export async function syncGoogleCalendarEventStatus(appointment: AppointmentRow, status: AppointmentStatus): Promise<CalendarResult> {
-  if (!isGoogleCalendarConfigured()) {
+export async function syncGoogleCalendarEventStatus(
+  appointment: AppointmentRow,
+  status: AppointmentStatus,
+  calendarIdOverride?: string
+): Promise<CalendarResult> {
+  if (!isGoogleCalendarConfigured(calendarIdOverride)) {
     return { status: "skipped", reason: "Google Calendar no esta configurado." };
   }
 
   if (status === "cancelled" && appointment.google_calendar_event_id) {
     await callGoogleCalendar(`/events/${encodeURIComponent(appointment.google_calendar_event_id)}`, {
       method: "DELETE"
-    });
+    }, undefined, calendarIdOverride);
     return { status: "deleted" };
   }
 
@@ -422,7 +429,34 @@ export async function syncGoogleCalendarEventStatus(appointment: AppointmentRow,
   const body = await callGoogleCalendar(`/events/${encodeURIComponent(appointment.google_calendar_event_id)}`, {
     method: "PATCH",
     body: JSON.stringify(getEventBody(appointment, status))
-  }) as GoogleCalendarEventResponse;
+  }, undefined, calendarIdOverride) as GoogleCalendarEventResponse;
+
+  return { status: "updated", eventId: body.id ?? appointment.google_calendar_event_id };
+}
+
+export async function releaseGoogleCalendarEventAtEight(
+  appointment: AppointmentRow,
+  calendarIdOverride?: string
+): Promise<CalendarResult> {
+  if (!appointment.google_calendar_event_id) {
+    return { status: "skipped", reason: "La cita no tiene evento relacionado." };
+  }
+  if (!isGoogleCalendarConfigured(calendarIdOverride)) {
+    return { status: "skipped", reason: "Google Calendar no esta configurado." };
+  }
+
+  const releasedAppointment = {
+    ...appointment,
+    appointment_time: "08:00",
+    status: "cancelled" as const
+  };
+  const eventBody = getEventBody(releasedAppointment, "cancelled");
+  eventBody.summary = `NO CONFIRMÓ - ${getAppointmentSummary(appointment, "pending")}`;
+
+  const body = await callGoogleCalendar(`/events/${encodeURIComponent(appointment.google_calendar_event_id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(eventBody)
+  }, undefined, calendarIdOverride) as GoogleCalendarEventResponse;
 
   return { status: "updated", eventId: body.id ?? appointment.google_calendar_event_id };
 }

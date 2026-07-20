@@ -6,10 +6,12 @@ import {
   unixSecondsToIso,
   verifyMetaSignature
 } from "@/lib/meta-whatsapp";
+import { handleAppointmentConfirmationReply } from "@/services/appointment-confirmations";
 
 export const runtime = "nodejs";
 
 type MetaMessage = Record<string, unknown> & {
+  context?: { id?: string };
   from?: string;
   id?: string;
   referral?: {
@@ -238,6 +240,15 @@ export async function POST(request: NextRequest) {
       for (const message of value.messages ?? []) {
         const saved = await saveIncomingMessage(value, message);
         if (saved) {
+          try {
+            await handleAppointmentConfirmationReply(
+              saved.whatsapp,
+              getIncomingMessageBody(message),
+              message.context?.id
+            );
+          } catch (confirmationError) {
+            console.error("No se pudo procesar la respuesta de confirmación", confirmationError);
+          }
           try {
             await sendAutomaticMetaAdWelcome(message, saved);
           } catch (welcomeError) {

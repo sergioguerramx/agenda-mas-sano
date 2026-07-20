@@ -44,6 +44,23 @@ function formatTime(time: string) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
+function getMonterreyToday() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Monterrey",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addOneDay(dateIso: string) {
+  const date = new Date(`${dateIso}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
 export async function POST(request: NextRequest) {
   const adminEmail = await getAuthenticatedAdminEmail(request);
   if (!adminEmail) {
@@ -120,6 +137,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Esta cita ya estaba registrada." }, { status: 409 });
     }
 
+    const today = getMonterreyToday();
+    const immediatelyConfirmed = date <= addOneDay(today);
+    const initialStatus = immediatelyConfirmed ? "confirmed" : "pending";
+
     const { data: inserted, error: insertError } = await client
       .from("appointments")
       .insert({
@@ -128,7 +149,7 @@ export async function POST(request: NextRequest) {
         whatsapp: conversation.whatsapp,
         appointment_date: date,
         appointment_time: time,
-        status: "pending",
+        status: initialStatus,
         brand: "mas_sano",
         modality: "presencial",
         service: "sesion_integral_399",
@@ -167,7 +188,9 @@ export async function POST(request: NextRequest) {
       updated_at: updatedAt
     }).eq("id", conversationId);
 
-    const confirmationDraft = `Hola ${firstName}, tu cita en Más Sano ${branch.name} quedó agendada para el ${formatDisplayDate(date)} a las ${formatTime(time)}. Un día antes te escribiremos para confirmar tu asistencia.`;
+    const confirmationDraft = immediatelyConfirmed
+      ? `Hola ${firstName}, tu cita en Más Sano ${branch.name} ya quedó agendada y confirmada 📌 para el ${formatDisplayDate(date)} a las ${formatTime(time)}. ¡Te esperamos!`
+      : `Hola ${firstName}, tu cita en Más Sano ${branch.name} quedó agendada para el ${formatDisplayDate(date)} a las ${formatTime(time)}. Te escribiremos previamente para confirmar tu asistencia.`;
     return NextResponse.json({
       appointmentId: appointment.id,
       branchName: branch.name,

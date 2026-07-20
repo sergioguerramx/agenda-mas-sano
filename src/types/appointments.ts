@@ -42,6 +42,14 @@ export type AppointmentRow = {
   cliente_id?: string | null;
   correo?: string | null;
   branch_code?: "SN" | "MTY_SUR" | null;
+  confirmation_first_sent_at?: string | null;
+  confirmation_second_sent_at?: string | null;
+  confirmation_response?: "confirmed" | "reprogram_requested" | null;
+  confirmation_response_at?: string | null;
+  confirmation_released_at?: string | null;
+  confirmation_release_notice_sent_at?: string | null;
+  confirmation_original_time?: string | null;
+  confirmation_last_error?: string | null;
   created_at?: string;
   updated_at?: string;
 };
