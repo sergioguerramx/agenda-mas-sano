@@ -123,13 +123,13 @@ type ScheduleSlot = {
   remaining: number;
 };
 
-function getPanelRedirectUrl() {
+function getPanelRedirectUrl(nextPath = "/panel") {
   const browserOrigin = window.location.origin.replace(/\/+$/, "");
   const envSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
   const safeSiteUrl = browserOrigin.includes("localhost")
     ? envSiteUrl && !envSiteUrl.includes("localhost") ? envSiteUrl : PRODUCTION_SITE_URL
     : browserOrigin;
-  return `${safeSiteUrl}/auth/panel-callback`;
+  return `${safeSiteUrl}/auth/panel-callback?next=${encodeURIComponent(nextPath)}`;
 }
 
 function formatDateTime(value: string | null) {
@@ -202,14 +202,27 @@ function buildBookingUrl(conversation: Conversation, patient: PatientMatch | nul
   return `/?${params.toString()}#agenda`;
 }
 
-async function isAdmin(client: SupabaseClient, session: Session | null) {
+async function hasInboxAccess(client: SupabaseClient, session: Session | null, mode: "admin" | "team") {
   const email = session?.user.email ?? "";
-  if (!session || !isAllowedAdminEmail(email)) return false;
-  const { data } = await client.from("admin_users").select("email").eq("email", email).maybeSingle();
+  if (!session || !email) return false;
+
+  if (isAllowedAdminEmail(email)) {
+    const { data } = await client.from("admin_users").select("email").eq("email", email).maybeSingle();
+    if (data) return true;
+  }
+  if (mode === "admin") return false;
+
+  const { data } = await client
+    .from("message_access_users")
+    .select("email")
+    .eq("email", email.toLowerCase())
+    .eq("active", true)
+    .maybeSingle();
   return Boolean(data);
 }
 
-export function WhatsAppInbox() {
+export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
+  const teamMode = mode === "team";
   const [client, setClient] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [allowed, setAllowed] = useState(false);
@@ -276,6 +289,20 @@ export function WhatsAppInbox() {
   }, []);
 
   const loadConversation = useCallback(async (supabase: SupabaseClient, conversation: Conversation) => {
+    if (teamMode) {
+      const { data: messageData } = await supabase
+        .from("whatsapp_messages")
+        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at")
+        .eq("conversation_id", conversation.id)
+        .order("sent_at", { ascending: true });
+      setMessages((messageData ?? []) as InboxMessage[]);
+      setPatientMatches([]);
+      setPatientHistory([]);
+      setBranches([]);
+      setActivePatientId("");
+      return;
+    }
+
     const [{ data: messageData }, { data: patientData }, { data: branchData }] = await Promise.all([
       supabase
         .from("whatsapp_messages")
@@ -311,7 +338,7 @@ export function WhatsAppInbox() {
       await supabase.from("whatsapp_conversations").update({ unread_count: 0 }).eq("id", conversation.id);
       setConversations((current) => current.map((item) => item.id === conversation.id ? { ...item, unread_count: 0 } : item));
     }
-  }, []);
+  }, [teamMode]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -325,7 +352,7 @@ export function WhatsAppInbox() {
     let active = true;
 
     async function applySession(nextSession: Session | null) {
-      const hasAccess = await isAdmin(supabase, nextSession);
+      const hasAccess = await hasInboxAccess(supabase, nextSession, mode);
       if (!active) return;
       setSession(nextSession);
       setAllowed(hasAccess);
@@ -342,7 +369,7 @@ export function WhatsAppInbox() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [loadConversations]);
+  }, [loadConversations, mode]);
 
   useEffect(() => {
     if (!client || !allowed) return;
@@ -372,6 +399,20 @@ export function WhatsAppInbox() {
     setScheduleNotice("");
     setNotice("");
     await loadConversation(client, conversation);
+    if (teamMode && conversation.unread_count > 0) {
+      try {
+        const response = await fetchAsAdmin("/api/admin/whatsapp/read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: conversation.id })
+        });
+        if (response.ok) {
+          setConversations((current) => current.map((item) => item.id === conversation.id ? { ...item, unread_count: 0 } : item));
+        }
+      } catch {
+        // La conversación puede abrirse aunque el indicador tarde en actualizarse.
+      }
+    }
   }
 
   async function saveConversationDetails() {
@@ -531,21 +572,26 @@ export function WhatsAppInbox() {
 
   async function login() {
     if (!client) return;
-    await client.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getPanelRedirectUrl() } });
+    await client.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: getPanelRedirectUrl(teamMode ? "/mensajes" : "/panel") }
+    });
   }
 
   if (loading) return <main className="page"><div className="shell"><section className="card panel-card"><p className="copy">Cargando bandeja...</p></section></div></main>;
 
   if (!session || !allowed) {
-    return <main className="page"><div className="shell"><section className="card panel-card"><h2>Acceso administrativo</h2><p className="copy">Entra con Google para abrir la bandeja de Más Sano.</p>{notice && <p className="error">{notice}</p>}<div className="actions"><button className="primary" onClick={login} type="button"><LogIn size={18} />Entrar con Google</button></div></section></div></main>;
+    return <main className="page"><div className="shell"><section className="card panel-card"><h2>{teamMode ? "Acceso a mensajes" : "Acceso administrativo"}</h2><p className="copy">Entra con uno de los correos autorizados para abrir la bandeja de Más Sano.</p>{session && !allowed && <p className="error">Este correo no tiene permiso para entrar.</p>}{notice && <p className="error">{notice}</p>}<div className="actions"><button className="primary" onClick={login} type="button"><LogIn size={18} />Entrar con Google</button></div></section></div></main>;
   }
 
   return (
     <main className="page inbox-page">
       <div className="shell inbox-shell">
         <header className="top inbox-top">
-          <div><p className="eyebrow">Panel interno</p><h1 className="title">Mensajes de Más Sano</h1></div>
-          <button className="secondary compact-button" onClick={() => { window.location.href = "/panel"; }} type="button"><ArrowLeft size={17} />Agenda</button>
+          <div><p className="eyebrow">{teamMode ? "Atención de sucursales" : "Panel interno"}</p><h1 className="title">Mensajes de Más Sano</h1></div>
+          {teamMode
+            ? <button className="secondary compact-button" onClick={() => client?.auth.signOut()} type="button">Salir</button>
+            : <button className="secondary compact-button" onClick={() => { window.location.href = "/panel"; }} type="button"><ArrowLeft size={17} />Agenda</button>}
         </header>
         <section className="card inbox-layout">
           <aside className={`inbox-sidebar ${selected ? "has-selection" : ""}`}>
@@ -573,21 +619,21 @@ export function WhatsAppInbox() {
             </div>
           </aside>
           <section className={`chat-panel ${selected ? "open" : ""}`}>
-            {!selected ? <div className="chat-placeholder"><MessageCircle size={32} /><strong>Selecciona una conversación</strong><p className="copy">Podrás ver a la paciente, su historial, registrar seguimiento y responder desde aquí.</p></div> : (
+            {!selected ? <div className="chat-placeholder"><MessageCircle size={32} /><strong>Selecciona una conversación</strong><p className="copy">{teamMode ? "Podrás responder mensajes y crear citas en cualquiera de las dos sucursales." : "Podrás ver a la paciente, su historial, registrar seguimiento y responder desde aquí."}</p></div> : (
               <>
                 <header className="chat-header">
                   <button className="icon-button mobile-back" onClick={() => setSelectedId("")} aria-label="Volver a conversaciones" type="button"><ArrowLeft size={18} /></button>
                   <div className="chat-contact"><strong>{selected.contact_name || selected.whatsapp}</strong><p className="copy">{selected.whatsapp}</p></div>
-                  <div className="patient-matches">
+                  {!teamMode && <div className="patient-matches">
                     {patientMatches.map((patient) => <button className={`badge patient-badge ${activePatient?.patient_id === patient.patient_id ? "active" : ""}`} key={patient.patient_id} onClick={() => setActivePatientId(patient.patient_id)} type="button">{patient.full_name} · {segmentLabel(patient.segment_key)}</button>)}
                     {patientMatches.length === 0 && <span className="badge">Contacto aún no relacionado</span>}
-                  </div>
+                  </div>}
                 </header>
 
                 <div className="chat-action-bar">
                   <button className={`secondary mini-action ${showScheduler ? "active" : ""}`} onClick={openScheduler} type="button"><CalendarPlus size={16} />Agendar cita</button>
-                  <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => { setShowScheduler(false); setShowDetails((value) => !value); }} type="button"><UserRound size={16} />Ficha y seguimiento</button>
-                  <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer">Abrir agenda pública</a>
+                  {!teamMode && <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => { setShowScheduler(false); setShowDetails((value) => !value); }} type="button"><UserRound size={16} />Ficha y seguimiento</button>}
+                  {!teamMode && <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer">Abrir agenda pública</a>}
                 </div>
 
                 {showScheduler && (
@@ -634,7 +680,7 @@ export function WhatsAppInbox() {
                   </section>
                 )}
 
-                {showDetails && (
+                {!teamMode && showDetails && (
                   <section className="conversation-details-panel">
                     <div className="patient-summary-section">
                       <div className="detail-heading"><ClipboardList size={17} /><strong>Paciente e historial</strong></div>
@@ -665,7 +711,7 @@ export function WhatsAppInbox() {
                 </div>
 
                 <div className="quick-replies" aria-label="Respuestas rápidas">
-                  {QUICK_REPLIES.map((reply) => <button key={reply.label} onClick={() => setDraft(reply.text(firstName(activePatient?.full_name)))} type="button">{reply.label}</button>)}
+                  {QUICK_REPLIES.map((reply) => <button key={reply.label} onClick={() => setDraft(reply.text(firstName(activePatient?.full_name ?? selected.contact_name)))} type="button">{reply.label}</button>)}
                 </div>
                 <div className="composer">
                   {notice && <p className={notice === "Seguimiento guardado." || notice.startsWith("Cita creada") ? "success-note composer-notice" : "error composer-notice"}>{notice}</p>}

@@ -17,6 +17,8 @@ export default function PanelAuthCallbackPage() {
       const searchParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const code = searchParams.get("code");
+      const requestedPath = searchParams.get("next");
+      const nextPath = requestedPath === "/mensajes" ? "/mensajes" : "/panel";
       const hasHashSession = hashParams.has("access_token") || hashParams.has("refresh_token");
 
       try {
@@ -30,7 +32,7 @@ export default function PanelAuthCallbackPage() {
 
         await supabase.auth.getSession();
 
-        window.location.replace("/panel");
+        window.location.replace(nextPath);
       } catch (error) {
         const detail = error instanceof Error ? error.message : "No se pudo completar el login.";
         setMessage(`No se pudo completar el login: ${detail}`);

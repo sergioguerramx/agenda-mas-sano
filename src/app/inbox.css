@@ -87,6 +87,23 @@
 .send-button{align-self:end}
 .send-button:disabled,.save-follow-up:disabled{opacity:.5;cursor:not-allowed}
 .empty-inbox{padding:1rem;text-align:center}
+.access-manager{display:grid;gap:1rem}
+.access-intro{display:flex;align-items:flex-start;gap:.7rem;padding:.85rem;border:1px solid var(--line);border-radius:8px;background:#fffaf4}
+.access-intro svg{flex:0 0 auto;color:var(--olive)}
+.access-intro .copy{margin:.2rem 0 0}
+.access-add{display:grid;gap:.4rem}
+.access-add>label{color:var(--olive);font-size:.82rem;font-weight:800}
+.access-add>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.55rem}
+.access-add input{min-height:2.85rem;padding:.7rem;border:1px solid var(--line);border-radius:8px;background:white}
+.access-list{display:grid;gap:.55rem}
+.access-list article{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.75rem;border:1px solid var(--line);border-radius:8px;background:white}
+.access-list article>div:first-child{display:grid;gap:.16rem;min-width:0}
+.access-list strong{overflow:hidden;text-overflow:ellipsis}
+.access-list span{color:var(--muted);font-size:.78rem}
+.access-confirm{display:flex;gap:.4rem}
+.access-confirm .secondary,.danger-button{min-height:2.3rem;padding:.45rem .6rem;border-radius:8px;font-size:.76rem;font-weight:800}
+.danger-button{border:1px solid #a33b2f;background:#a33b2f;color:white}
+.danger-button:disabled{opacity:.5;cursor:not-allowed}
 
 @media(max-width:760px){
   .inbox-page{height:100dvh;min-height:0;padding:.35rem}
@@ -118,4 +135,8 @@
   .composer{position:sticky;bottom:0;grid-template-columns:minmax(0,1fr);gap:.45rem;padding:.55rem}
   .composer textarea{min-height:3.2rem;max-height:5.5rem;resize:none}
   .send-button{width:100%;min-height:2.65rem}
+  .access-add>div{grid-template-columns:1fr}
+  .access-add .primary{width:100%}
+  .access-list article{align-items:flex-start}
+  .access-confirm{flex-direction:column}
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
+import { getAuthenticatedMessagingEmail } from "@/lib/admin-auth";
 import { buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
@@ -62,8 +62,8 @@ function addOneDay(dateIso: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const adminEmail = await getAuthenticatedAdminEmail(request);
-  if (!adminEmail) {
+  const operatorEmail = await getAuthenticatedMessagingEmail(request);
+  if (!operatorEmail) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
     await client.from("whatsapp_conversations").update({
       workflow_status: "cita_agendada",
       branch_interest: branchCode,
-      updated_by_email: adminEmail,
+      updated_by_email: operatorEmail,
       updated_at: updatedAt
     }).eq("id", conversationId);
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
+import { getAuthenticatedMessagingEmail } from "@/lib/admin-auth";
 import { isCloudWhatsAppOutboundEnabled } from "@/lib/meta-whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!await getAuthenticatedAdminEmail(request)) {
+  if (!await getAuthenticatedMessagingEmail(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

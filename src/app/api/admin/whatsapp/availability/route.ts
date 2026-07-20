@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
+import { getAuthenticatedMessagingEmail } from "@/lib/admin-auth";
 import { buildSlotsForDate } from "@/lib/schedule";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { getGoogleCalendarSlotCounts } from "@/services/google-calendar";
@@ -10,7 +10,7 @@ const BRANCH_CODES = new Set(["SN", "MTY_SUR"]);
 const MTY_SUR_OPENING_DATE = "2026-08-03";
 
 export async function GET(request: NextRequest) {
-  if (!await getAuthenticatedAdminEmail(request)) {
+  if (!await getAuthenticatedMessagingEmail(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
