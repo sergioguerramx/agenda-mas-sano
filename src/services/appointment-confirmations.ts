@@ -170,8 +170,10 @@ async function claimAndSendConfirmation(
 
   try {
     const templates = getAppointmentTemplateNames();
-    const body = confirmationCopy(appointment, branch.name, stage);
-    const templateName = stage === "first" ? templates.first : templates.second;
+    const isSaturdayAppointment = new Date(`${appointment.appointment_date}T12:00:00Z`).getUTCDay() === 6;
+    const useGenericTemplate = stage === "second" && isSaturdayAppointment;
+    const body = confirmationCopy(appointment, branch.name, useGenericTemplate ? "first" : stage);
+    const templateName = stage === "first" || useGenericTemplate ? templates.first : templates.second;
     const metaMessageId = await sendCloudWhatsAppTemplate(
       appointment.whatsapp,
       templateName,
