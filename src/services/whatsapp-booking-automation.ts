@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { BRANCH_SHORT_NAMES, getBranchLocation } from "@/lib/branch-locations";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
 import {
   isCloudWhatsAppOutboundEnabled,
@@ -51,21 +52,6 @@ const PRICE_CHANGE_AT = new Date("2026-08-01T17:00:00-06:00").getTime();
 const FALLBACK_TEST_WHATSAPP = "+528132469930";
 const AUTOMATION_SENDER = "automatizacion";
 const MAX_INVALID_ATTEMPTS = 2;
-
-const BRANCHES: Record<BranchCode, { name: string; address: string; mapsUrl: string }> = {
-  SN: {
-    name: "San Nicolás",
-    address: process.env.MAS_SANO_SN_ADDRESS?.trim()
-      || "Av. Las Puentes 511, Col. Las Puentes 3er Sector, San Nicolás de los Garza, Nuevo León.",
-    mapsUrl: process.env.MAS_SANO_SN_MAPS_URL?.trim()
-      || "https://maps.app.goo.gl/CwQyKxpUpvgNCEjX7"
-  },
-  MTY_SUR: {
-    name: "Monterrey Sur",
-    address: process.env.MAS_SANO_MTY_SUR_ADDRESS?.trim() || "Zona Garza Sada, Monterrey.",
-    mapsUrl: process.env.MAS_SANO_MTY_SUR_MAPS_URL?.trim() || ""
-  }
-};
 
 function normalize(value: string) {
   return value
@@ -249,13 +235,12 @@ async function sendBranchQuestion(client: SupabaseClient, conversation: Conversa
 }
 
 function locationsMessage() {
-  const southMap = BRANCHES.MTY_SUR.mapsUrl
-    ? `\n🗺️ ${BRANCHES.MTY_SUR.mapsUrl}`
-    : "\n🗺️ El enlace exacto se añadirá al terminar de publicar la nueva ubicación.";
+  const sanNicolas = getBranchLocation("SN");
+  const monterreySur = getBranchLocation("MTY_SUR");
   return [
     "Estas son nuestras sucursales 💚",
-    `📍 San Nicolás\n${BRANCHES.SN.address}\n🗺️ ${BRANCHES.SN.mapsUrl}`,
-    `📍 Monterrey Sur\n${BRANCHES.MTY_SUR.address}${southMap}`,
+    `📍 San Nicolás\n${sanNicolas.address}\n🗺️ ${sanNicolas.mapsUrl}`,
+    `📍 Monterrey Sur\n${monterreySur.address}\n🗺️ ${monterreySur.mapsUrl}`,
     "Selecciona la que te resulte más conveniente."
   ].join("\n\n");
 }
@@ -475,12 +460,12 @@ async function createAutomaticAppointment(
     follow_up_at: null
   });
 
-  const location = BRANCHES[branchCode];
+  const location = getBranchLocation(branchCode, date);
   const locationLines = [`📍 ${location.address}`];
   if (location.mapsUrl) locationLines.push(`🗺️ ${location.mapsUrl}`);
   const confirmation = immediatelyConfirmed
     ? [
-        `¡Listo, ${firstName}! Tu cita en Más Sano ${branch.name} quedó agendada y confirmada 📌`,
+        `¡Listo, ${firstName}! Tu cita en Más Sano ${BRANCH_SHORT_NAMES[branchCode]} quedó agendada y confirmada 📌`,
         `📅 ${formatDisplayDate(date)}`,
         `🕐 ${formatTime(time)}`,
         `💚 Sesión Integral: $${offer.price}`,
@@ -489,7 +474,7 @@ async function createAutomaticAppointment(
         "Será un gusto recibirte 💚"
       ].join("\n\n")
     : [
-        `¡Listo, ${firstName}! Tu cita en Más Sano ${branch.name} quedó agendada 📌`,
+        `¡Listo, ${firstName}! Tu cita en Más Sano ${BRANCH_SHORT_NAMES[branchCode]} quedó agendada 📌`,
         `📅 ${formatDisplayDate(date)}`,
         `🕐 ${formatTime(time)}`,
         `💚 Sesión Integral: $${offer.price}`,
@@ -552,7 +537,7 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
     await sendText(
       client,
       conversation,
-      `Perfecto 💚 Elegiste Más Sano ${BRANCHES[branchCode].name}.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
+      `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
     );
     return true;
   }

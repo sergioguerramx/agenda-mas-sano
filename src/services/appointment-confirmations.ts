@@ -5,6 +5,7 @@ import {
   sendCloudWhatsAppTemplate,
   sendCloudWhatsAppText
 } from "@/lib/meta-whatsapp";
+import { BRANCH_SHORT_NAMES, getBranchLocation } from "@/lib/branch-locations";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { releaseGoogleCalendarEventAtEight, syncGoogleCalendarEventStatus } from "@/services/google-calendar";
 import type { AppointmentRow } from "@/types/appointments";
@@ -186,7 +187,8 @@ async function claimAndSendConfirmation(
     const templates = getAppointmentTemplateNames();
     const isSaturdayAppointment = new Date(`${appointment.appointment_date}T12:00:00Z`).getUTCDay() === 6;
     const useGenericTemplate = stage === "second" && isSaturdayAppointment;
-    const body = confirmationCopy(appointment, branch.name, useGenericTemplate ? "first" : stage);
+    const branchDisplayName = BRANCH_SHORT_NAMES[branch.code as "SN" | "MTY_SUR"] ?? branch.name;
+    const body = confirmationCopy(appointment, branchDisplayName, useGenericTemplate ? "first" : stage);
     const templateName = stage === "first" || useGenericTemplate ? templates.first : templates.second;
     const metaMessageId = deliveryMode === "buttons"
       ? await sendCloudWhatsAppReplyButtons(appointment.whatsapp, body, CONFIRMATION_BUTTONS)
@@ -194,7 +196,7 @@ async function claimAndSendConfirmation(
         appointment.whatsapp,
         templateName,
         templates.language,
-        [appointment.first_name, formatDate(appointment.appointment_date), formatTime(appointment.appointment_time), branch.name]
+        [appointment.first_name, formatDate(appointment.appointment_date), formatTime(appointment.appointment_time), branchDisplayName]
       );
     await saveOutboundMessage(appointment, metaMessageId, body, claimTime);
     return "sent";
@@ -567,9 +569,18 @@ export async function handleAppointmentConfirmationReply(
       "confirmed",
       branch?.calendar_email ?? undefined
     );
+    const branchCode = (appointment.branch_code ?? "SN") as "SN" | "MTY_SUR";
+    const location = getBranchLocation(branchCode, appointment.appointment_date);
     await sendReplyAndSave(
       appointment,
-      `¡Gracias, ${appointment.first_name}! ✔️ Tu cita de ${formatDate(appointment.appointment_date)} a las ${formatTime(appointment.appointment_time)} quedó confirmada. ¡Te esperamos!`
+      [
+        `¡Gracias, ${appointment.first_name}! Tu cita ha quedado confirmada ✅`,
+        `📍 Sucursal ${BRANCH_SHORT_NAMES[branchCode]}`,
+        `📅 ${formatDate(appointment.appointment_date)}`,
+        `🕐 ${formatTime(appointment.appointment_time)}`,
+        `🗺️ ${location.mapsUrl}`,
+        "Será un gusto recibirte 💚"
+      ].join("\n\n")
     );
     return true;
   }

@@ -15,6 +15,7 @@ import {
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isAllowedAdminEmail } from "@/lib/admin";
+import { getBranchLocation } from "@/lib/branch-locations";
 import { buildAvailableDates } from "@/lib/schedule";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -52,7 +53,17 @@ const QUICK_REPLIES = [
   },
   {
     label: "Ubicación SN",
-    text: () => "Estamos en Av. Las Puentes 511, Col. Las Puentes 3er Sector, San Nicolás."
+    text: () => {
+      const location = getBranchLocation("SN");
+      return `Más Sano San Nicolás está en ${location.address}\n${location.mapsUrl}`;
+    }
+  },
+  {
+    label: "Ubicación Sur",
+    text: () => {
+      const location = getBranchLocation("MTY_SUR");
+      return `Más Sano Monterrey Sur está en ${location.address}\n${location.mapsUrl}`;
+    }
   },
   {
     label: "Confirmación",

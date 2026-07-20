@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedMessagingEmail } from "@/lib/admin-auth";
+import { BRANCH_SHORT_NAMES, getBranchLocation } from "@/lib/branch-locations";
 import { buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
@@ -188,9 +189,11 @@ export async function POST(request: NextRequest) {
       updated_at: updatedAt
     }).eq("id", conversationId);
 
+    const location = getBranchLocation(branchCode as "SN" | "MTY_SUR", date);
+    const branchDisplayName = BRANCH_SHORT_NAMES[branchCode as "SN" | "MTY_SUR"];
     const confirmationDraft = immediatelyConfirmed
-      ? `Hola ${firstName}, tu cita en Más Sano ${branch.name} ya quedó agendada y confirmada 📌 para el ${formatDisplayDate(date)} a las ${formatTime(time)}. ¡Te esperamos!`
-      : `Hola ${firstName}, tu cita en Más Sano ${branch.name} quedó agendada para el ${formatDisplayDate(date)} a las ${formatTime(time)}. Te escribiremos previamente para confirmar tu asistencia.`;
+      ? `Hola ${firstName}, tu cita en Más Sano ${branchDisplayName} quedó agendada y confirmada 📌\n\n📅 ${formatDisplayDate(date)}\n🕐 ${formatTime(time)}\n📍 ${location.address}\n🗺️ ${location.mapsUrl}\n\nSerá un gusto recibirte 💚`
+      : `Hola ${firstName}, tu cita en Más Sano ${branchDisplayName} quedó agendada 📌\n\n📅 ${formatDisplayDate(date)}\n🕐 ${formatTime(time)}\n📍 ${location.address}\n🗺️ ${location.mapsUrl}\n\nAntes de tu cita te escribiremos para confirmar tu asistencia. Será un gusto recibirte 💚`;
     return NextResponse.json({
       appointmentId: appointment.id,
       branchName: branch.name,
