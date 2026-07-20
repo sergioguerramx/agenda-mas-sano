@@ -354,8 +354,11 @@ async function showAvailableSlots(
   }));
   if (hasMore) rows.push({ id: "book_more_times", title: "Más horarios", description: "Mostrar otras opciones" });
 
-  const availabilityMessage = context.branchCode === "SN"
-    ? `Para el ${formatDisplayDate(context.date)} te atenderemos en ${getBranchLocation("SN", context.date).label} 💚\n\nEstos son los horarios disponibles:`
+  const sanNicolasLocation = context.branchCode === "SN"
+    ? getBranchLocation("SN", context.date)
+    : null;
+  const availabilityMessage = sanNicolasLocation
+    ? `Para el ${formatDisplayDate(context.date)} te atenderemos en ${sanNicolasLocation.label} 💚\n\n📍 ${sanNicolasLocation.address}\n🗺️ ${sanNicolasLocation.mapsUrl}\n\nEstos son los horarios disponibles:`
     : `Para el ${formatDisplayDate(context.date)} tenemos estos horarios disponibles:`;
 
   await updateAutomation(client, conversation.id, "awaiting_time", {
@@ -547,11 +550,12 @@ export async function handleWhatsAppBookingAutomation(message: IncomingBookingMe
       branch_interest: branchCode,
       workflow_status: "interesado"
     });
+    const monterreySurLocation = branchCode === "MTY_SUR" ? getBranchLocation("MTY_SUR") : null;
     await sendText(
       client,
       conversation,
-      branchCode === "MTY_SUR"
-        ? `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n📅 Tenemos disponibilidad a partir del lunes 3 de agosto.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
+      monterreySurLocation
+        ? `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n📍 ${monterreySurLocation.address}\n🗺️ ${monterreySurLocation.mapsUrl}\n\n📅 Tenemos disponibilidad a partir del lunes 3 de agosto.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
         : `Perfecto 💚 Elegiste Más Sano ${BRANCH_SHORT_NAMES[branchCode]}.\n\n¿Qué día te gustaría venir y prefieres horario de mañana o tarde?`
     );
     return true;
