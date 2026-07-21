@@ -441,7 +441,7 @@ export function PanelDashboard() {
         Apellidos: contact.lastName,
         WhatsApp: contact.whatsapp,
         Origen: contact.source,
-        Sucursal: contact.branch,
+        Sucursal: getBranchLabel(contact.branch),
         "Primera cita": contact.firstAppointmentDate,
         "Ultima cita": contact.lastAppointmentDate,
         "Total citas": contact.totalAppointments,
@@ -567,6 +567,7 @@ export function PanelDashboard() {
               </div>
               <p className="copy">
                 <strong>Resultado:</strong> {appointmentReportSummary.total} citas encontradas.
+                {" "}Sucursal: {branchFilter ? getBranchLabel(branchFilter) : "Todas las sucursales"}.
                 {" "}Fecha de cita: {appointmentReportSummary.appointmentPeriod}.
                 {" "}Fecha en que se agendo: {appointmentReportSummary.registrationPeriod}.
               </p>
@@ -623,7 +624,8 @@ export function PanelDashboard() {
                       <div>
                         <strong>{formatContactName(contact.firstName, contact.lastName)}</strong>
                         <p className="copy">WhatsApp: {contact.whatsapp}</p>
-                        <p className="copy">{contact.branch} - {contact.source}</p>
+                        <p className="copy">Sucursal: {getBranchLabel(contact.branch)}</p>
+                        <p className="copy">Origen: {contact.source}</p>
                         <p className="copy">Google Contacts: {getGoogleContactsLabel(contact.googleContactId)}</p>
                         <p className="copy">Total de citas: {contact.totalAppointments} - Ultima cita: {contact.lastAppointmentDate}</p>
                         <p className="copy">Primera cita: {contact.firstAppointmentDate}</p>
