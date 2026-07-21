@@ -298,6 +298,32 @@ function parseDateAndShift(body: string, branchCode?: BranchCode) {
     date = `${year}-${String(Number(numericDate[2])).padStart(2, "0")}-${String(Number(numericDate[1])).padStart(2, "0")}`;
   }
 
+  const monthNumbers: Record<string, number> = {
+    enero: 1,
+    febrero: 2,
+    marzo: 3,
+    abril: 4,
+    mayo: 5,
+    junio: 6,
+    julio: 7,
+    agosto: 8,
+    septiembre: 9,
+    octubre: 10,
+    noviembre: 11,
+    diciembre: 12
+  };
+  const writtenDate = reply.match(
+    /\b(\d{1,2})\s+(?:de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(?:de\s+)?(\d{2,4}))?\b/
+  );
+  if (writtenDate) {
+    const today = getMonterreyToday();
+    const year = writtenDate[3]
+      ? Number(writtenDate[3]) < 100 ? 2000 + Number(writtenDate[3]) : Number(writtenDate[3])
+      : Number(today.slice(0, 4));
+    const month = monthNumbers[writtenDate[2]];
+    date = `${year}-${String(month).padStart(2, "0")}-${String(Number(writtenDate[1])).padStart(2, "0")}`;
+  }
+
   if (!shift && weekday && /\btarde\b/.test(reply)) shift = "afternoon";
   if (!shift && weekday && /\bmanana\b/.test(reply)) shift = "morning";
   return { date, shift };
