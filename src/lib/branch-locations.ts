@@ -41,7 +41,7 @@ const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
   ],
   MTY_SUR: [{
     label: "Distrito Tec",
-    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec.",
+    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec. Atrás del Teatro Nena Delgado.",
     mapsUrl: "https://maps.app.goo.gl/gVdFZaETS4RWCbyNA"
   }]
 };
