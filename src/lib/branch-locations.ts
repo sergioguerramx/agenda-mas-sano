@@ -30,18 +30,18 @@ const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
   SN: [
     {
       label: "Las Puentes",
-      address: "Av. Las Puentes 511, Las Puentes 3er Sector, San Nicolás de los Garza, N.L.",
+      address: "Av. Las Puentes 511, Col. Las Puentes 3er Sector.",
       mapsUrl: "https://maps.app.goo.gl/CwQyKxpUpvgNCEjX7"
     },
     {
       label: "Anáhuac",
-      address: "Col. Anáhuac, San Nicolás de los Garza, N.L.",
+      address: "Av. Topo Chico 50, Col. Anáhuac. Dentro de Edificio Anáhuac.",
       mapsUrl: "https://maps.app.goo.gl/T67AE5ndW6guX5sc8"
     }
   ],
   MTY_SUR: [{
     label: "Distrito Tec",
-    address: "Dentro de Equilibriovivo, Alejandría 120, Roma, Distrito Tec, 64700 Monterrey, N.L.",
+    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec.",
     mapsUrl: "https://maps.app.goo.gl/gVdFZaETS4RWCbyNA"
   }]
 };
@@ -61,4 +61,3 @@ export function getBranchLocation(branchCode: ActiveBranchCode, dateIso = getMon
   if (branchCode === "SN") return dateIso >= SAN_NICOLAS_MOVE_DATE ? LOCATIONS.SN[1] : LOCATIONS.SN[0];
   return LOCATIONS.MTY_SUR[0];
 }
-
