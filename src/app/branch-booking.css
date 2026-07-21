@@ -50,7 +50,8 @@
 }
 
 .booking-branch-status strong,
-.booking-branch-status small {
+.booking-branch-status small,
+.booking-branch-status em {
   display: block;
 }
 
@@ -63,6 +64,14 @@
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.3;
+}
+
+.booking-branch-status em {
+  margin-top: 0.18rem;
+  color: var(--clay);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .booking-branch-status button {

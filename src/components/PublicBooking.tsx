@@ -326,6 +326,7 @@ export function PublicBooking() {
                 <span>
                   <strong>Sucursal {BRANCH_SHORT_NAMES[draft.branchCode]}</strong>
                   <small>{location.address}</small>
+                  {draft.branchCode === "MTY_SUR" && <em>Nueva sucursal · Apertura 3 de agosto</em>}
                 </span>
                 <button onClick={() => setStep("branch")} type="button">Cambiar</button>
               </div>
