@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto";
+import { getBranchLocation } from "@/lib/branch-locations";
 import { getSlotCapacity } from "@/lib/schedule";
 import type { AppointmentRow, AppointmentStatus } from "@/types/appointments";
 
@@ -219,9 +220,13 @@ function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = a
   const patientName = getPatientName(appointment);
   const statusLabel = getStatusLabel(status);
   const isYss = isYoSoySanoAppointment(appointment);
+  const branchLocation = !isYss && appointment.branch_code
+    ? getBranchLocation(appointment.branch_code, appointment.appointment_date)
+    : null;
 
   return {
     summary: getAppointmentSummary(appointment, status),
+    ...(branchLocation ? { location: branchLocation.address } : {}),
     description: [
       `Paciente: ${patientName}`,
       `WhatsApp: ${appointment.whatsapp}`,
@@ -229,6 +234,8 @@ function getEventBody(appointment: AppointmentRow, status: AppointmentStatus = a
       isYss ? "Marca: Yo Soy Sano" : "Marca: Más Sano",
       isYss ? "Modalidad: Online" : "Modalidad: Presencial",
       appointment.service ? `Servicio: ${appointment.service}` : "",
+      branchLocation ? `Ubicación: ${branchLocation.address}` : "",
+      branchLocation ? `Mapa: ${branchLocation.mapsUrl}` : "",
       appointment.registro_id ? `Registro Yo Soy Sano: ${appointment.registro_id}` : "",
       appointment.cliente_id ? `Cliente Yo Soy Sano: ${appointment.cliente_id}` : "",
       `Estado interno: ${statusLabel}`,
