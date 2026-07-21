@@ -29,7 +29,7 @@ export const BRANCH_OPENING_DATES: Record<ActiveBranchCode, string | null> = {
   MTY_SUR: "2026-08-03"
 };
 
-const SAN_NICOLAS_MOVE_DATE = "2026-08-02";
+export const SAN_NICOLAS_MOVE_DATE = "2026-08-03";
 
 const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
   SN: [

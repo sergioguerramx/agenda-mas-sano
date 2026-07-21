@@ -913,6 +913,35 @@ blockquote {
   font-weight: 700;
 }
 
+.msnh-location-transition {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.msnh-location-transition > div {
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--msnh-border);
+}
+
+.msnh-location-transition strong {
+  display: block;
+  margin: 0.16rem 0 0.28rem;
+  color: var(--msnh-deep);
+  font-size: 1.08rem;
+}
+
+.msnh-location-transition p {
+  margin-bottom: 0.35rem;
+}
+
+.msnh-location-transition a {
+  color: var(--msnh-deep);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
 .msnh-location-card .msnh-actions {
   margin-top: auto;
   padding-top: 1.4rem;

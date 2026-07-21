@@ -29,8 +29,8 @@ export default function PrivacyPage() {
 
           <h2>Responsable</h2>
           <p className="copy">
-            Mas Sano Nutricion Holistica, ubicado en Av. Las Puentes 511, Col. Las Puentes 3er Sector, San Nicolas de
-            los Garza, Nuevo Leon, Mexico.
+            Mas Sano Nutricion Holistica, con atencion presencial en San Nicolas de los Garza y Monterrey Sur,
+            Nuevo Leon, Mexico.
           </p>
 
           <h2>Datos que podemos solicitar</h2>

@@ -7,6 +7,7 @@ import {
   BRANCH_SHORT_NAMES,
   getBranchLocation,
   MAS_SANO_COMMON_CONTACT,
+  SAN_NICOLAS_MOVE_DATE,
   type ActiveBranchCode
 } from "@/lib/branch-locations";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, getSlotCapacity, type ReservedSlots } from "@/lib/schedule";
@@ -27,7 +28,7 @@ const emptyDraft: AppointmentDraft = {
 };
 
 const branchOptions: Array<{ code: ActiveBranchCode; openingNote?: string }> = [
-  { code: "SN" },
+  { code: "SN", openingNote: "Cambio de ubicación · Anáhuac desde el 3 de agosto" },
   { code: "MTY_SUR", openingNote: "Nueva sucursal · Apertura 3 de agosto" }
 ];
 
@@ -326,6 +327,15 @@ export function PublicBooking() {
                 <span>
                   <strong>Sucursal {BRANCH_SHORT_NAMES[draft.branchCode]}</strong>
                   <small>{location.address}</small>
+                  {draft.branchCode === "SN" && (
+                    <em>
+                      {draft.date && draft.date >= SAN_NICOLAS_MOVE_DATE
+                        ? "Esta cita será en Anáhuac."
+                        : draft.date
+                          ? "Esta cita será en Las Puentes."
+                          : "Cambio de ubicación: Anáhuac desde el 3 de agosto."}
+                    </em>
+                  )}
                   {draft.branchCode === "MTY_SUR" && <em>Nueva sucursal · Apertura 3 de agosto</em>}
                 </span>
                 <button onClick={() => setStep("branch")} type="button">Cambiar</button>
