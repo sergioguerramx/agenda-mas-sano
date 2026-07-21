@@ -57,7 +57,7 @@ function normalize(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9:/. ]/gi, " ")
+    .replace(/[^a-z0-9:/. -]/gi, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -289,7 +289,7 @@ function parseDateAndShift(body: string, branchCode?: BranchCode) {
     if (!shift && /\bmanana\b/.test(reply)) shift = "morning";
   }
 
-  const numericDate = reply.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
+  const numericDate = reply.match(/\b(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{2,4}))?\b/);
   if (numericDate) {
     const today = getMonterreyToday();
     const year = numericDate[3]
@@ -324,8 +324,10 @@ function parseDateAndShift(body: string, branchCode?: BranchCode) {
     date = `${year}-${String(month).padStart(2, "0")}-${String(Number(writtenDate[1])).padStart(2, "0")}`;
   }
 
-  if (!shift && weekday && /\btarde\b/.test(reply)) shift = "afternoon";
-  if (!shift && weekday && /\bmanana\b/.test(reply)) shift = "morning";
+  const hasSpecificDate = Boolean(numericDate || writtenDate);
+  const hasRecognizedDay = Boolean(weekday || hasSpecificDate);
+  if (!shift && hasRecognizedDay && /\b(tarde|p\.?m\.?)\b/.test(reply)) shift = "afternoon";
+  if (!shift && hasRecognizedDay && /\b(manana|temprano|a\.?m\.?)\b/.test(reply)) shift = "morning";
   return { date, shift };
 }
 
