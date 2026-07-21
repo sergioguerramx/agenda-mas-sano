@@ -1,0 +1,50 @@
+.steps {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.branch-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.branch-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  min-height: 7.5rem;
+  text-align: left;
+}
+
+.branch-choice svg {
+  color: var(--olive);
+}
+
+.branch-choice small,
+.branch-choice em {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.branch-choice em {
+  color: var(--clay);
+  font-weight: 800;
+}
+
+@media (min-width: 560px) {
+  .branch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .steps button {
+    min-width: 0;
+    padding: 0.35rem 0.15rem;
+    font-size: 0.72rem;
+  }
+}

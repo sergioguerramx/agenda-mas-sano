@@ -5,6 +5,7 @@ import { buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
 import { createGoogleCalendarEvent, isGoogleCalendarSlotAvailable } from "@/services/google-calendar";
+import { upsertGoogleContact } from "@/services/google-contacts";
 import type { AppointmentRow } from "@/types/appointments";
 
 export const runtime = "nodejs";
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
   }
 
-  const requestedSlot = buildSlotsForDate(date, new Date()).find((slot) => slot.time === time);
+  const requestedSlot = buildSlotsForDate(date, new Date(), {}, branchCode as "SN" | "MTY_SUR").find((slot) => slot.time === time);
   if (!requestedSlot?.available) {
     return NextResponse.json({ error: "Ese horario ya no está disponible." }, { status: 409 });
   }
@@ -120,7 +121,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const calendarAvailable = await isGoogleCalendarSlotAvailable(date, time, branch.calendar_email);
+    const calendarAvailable = await isGoogleCalendarSlotAvailable(
+      date,
+      time,
+      branch.calendar_email,
+      branchCode as "SN" | "MTY_SUR"
+    );
     if (!calendarAvailable) {
       return NextResponse.json({ error: "Ese horario acaba de ocuparse. Elige otro." }, { status: 409 });
     }
@@ -180,6 +186,15 @@ export async function POST(request: NextRequest) {
       await syncContactFromAppointment(client, appointment.id);
     } catch (contactError) {
       console.warn("Appointment created but contact summary was not refreshed", { appointmentId: appointment.id, contactError });
+    }
+    try {
+      const googleContact = await upsertGoogleContact(appointment);
+      if (googleContact.resourceName) {
+        await client.from("appointments").update({ google_contact_id: googleContact.resourceName }).eq("id", appointment.id);
+        await client.from("contacts").update({ google_contact_resource_name: googleContact.resourceName }).eq("whatsapp", appointment.whatsapp);
+      }
+    } catch (googleContactError) {
+      console.warn("Appointment created but Google Contacts sync is pending", { appointmentId: appointment.id, googleContactError });
     }
     const updatedAt = new Date().toISOString();
     await client.from("whatsapp_conversations").update({

@@ -1,6 +1,7 @@
 export type AvailableDate = { iso: string; label: string; shortLabel: string; closed: boolean };
 export type Slot = { time: string; label: string; available: boolean; remaining: number };
 export type ReservedSlots = Record<string, number>;
+export type ScheduleBranchCode = "SN" | "MTY_SUR";
 
 const MAX_DAYS_AHEAD = 15;
 const MIN_ADVANCE_MINUTES = 30;
@@ -26,7 +27,12 @@ export function buildAvailableDates(now: Date): AvailableDate[] {
   });
 }
 
-export function buildSlotsForDate(dateIso: string, now: Date, reservedSlots: ReservedSlots = {}): Slot[] {
+export function buildSlotsForDate(
+  dateIso: string,
+  now: Date,
+  reservedSlots: ReservedSlots = {},
+  branchCode: ScheduleBranchCode = "SN"
+): Slot[] {
   const day = getDayOfWeek(dateIso);
   const current = getMonterreyDateParts(now);
   return (schedule[day] ?? []).flatMap((range) => {
@@ -34,7 +40,7 @@ export function buildSlotsForDate(dateIso: string, now: Date, reservedSlots: Res
     for (let cursor = toMinutes(range.start); cursor <= toMinutes(range.end); cursor += 20) {
       const time = fromMinutes(cursor);
       const reserved = reservedSlots[time] ?? 0;
-      const capacity = getSlotCapacity(dateIso, time);
+      const capacity = getSlotCapacity(dateIso, time, branchCode);
       const available = reserved < capacity && hasMinimumAdvance(dateIso, cursor, current);
       slots.push({ time, label: time, available, remaining: Math.max(capacity - reserved, 0) });
     }
@@ -42,7 +48,8 @@ export function buildSlotsForDate(dateIso: string, now: Date, reservedSlots: Res
   });
 }
 
-export function getSlotCapacity(dateIso: string, time: string) {
+export function getSlotCapacity(dateIso: string, time: string, branchCode: ScheduleBranchCode = "SN") {
+  if (branchCode === "MTY_SUR") return time.endsWith(":20") ? 2 : 1;
   if (getDayOfWeek(dateIso) === 6 && isSaturdayExtraCapacitySlot(time)) return SATURDAY_EXTRA_APPOINTMENTS_PER_SLOT;
   return DEFAULT_APPOINTMENTS_PER_SLOT;
 }

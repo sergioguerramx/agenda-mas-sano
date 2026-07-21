@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BRANCH_OPENING_DATES, type ActiveBranchCode } from "@/lib/branch-locations";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
 import { buildSlotsForDate } from "@/lib/schedule";
 import { syncContactFromAppointment } from "@/services/contacts";
@@ -15,12 +16,14 @@ type RequestPayload = {
   date?: string;
   time?: string;
   adOrigin?: string;
+  branchCode?: string;
 };
 
 type SupabaseSafeError = { message?: string; code?: string; details?: string; hint?: string };
 type PublicAppointmentResponse = { success: boolean; appointment_id?: string };
 
 const SLOT_TAKEN_MESSAGE = "Este horario acaba de ocuparse. Elige otro horario disponible.";
+const BRANCH_CODES = new Set<ActiveBranchCode>(["SN", "MTY_SUR"]);
 const VALID_AD_ORIGINS = new Set([
   "sin_identificar",
   "anuncio_n1",
@@ -103,6 +106,7 @@ async function getSlotDiagnostics(payload: RequestPayload) {
       .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, created_at, updated_at")
       .eq("appointment_date", payload.date)
       .eq("appointment_time", payload.time)
+      .eq("branch_code", payload.branchCode ?? "SN")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -126,6 +130,7 @@ async function getExistingAppointment(payload: RequestPayload, normalizedTime: s
       .eq("appointment_date", payload.date)
       .eq("appointment_time", normalizedTime)
       .eq("whatsapp", payload.whatsapp)
+      .eq("branch_code", payload.branchCode ?? "SN")
       .neq("status", "cancelled")
       .order("created_at", { ascending: false })
       .limit(10);
@@ -191,12 +196,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    const branchCode = payload.branchCode as ActiveBranchCode;
+    if (!BRANCH_CODES.has(branchCode)) {
+      return NextResponse.json({ error: "Elige una sucursal para continuar." }, { status: 400 });
+    }
     if (!payload.date || !payload.time) {
       return NextResponse.json({ error: "Elige fecha y horario para continuar." }, { status: 400 });
     }
+    const openingDate = BRANCH_OPENING_DATES[branchCode];
+    if (openingDate && payload.date < openingDate) {
+      return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
+    }
 
     const normalizedTime = payload.time.slice(0, 5);
-    const requestedSlot = buildSlotsForDate(payload.date, new Date()).find((slot) => slot.time === normalizedTime);
+    const requestedSlot = buildSlotsForDate(payload.date, new Date(), {}, branchCode).find((slot) => slot.time === normalizedTime);
 
     if (!requestedSlot || !requestedSlot.available) {
       console.warn("Appointment rejected by public schedule validation", {
@@ -226,7 +239,24 @@ export async function POST(request: Request) {
       return alreadyCreatedResponse(existingAppointment);
     }
 
-    const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(payload.date, payload.time);
+    const branchClient = createSupabaseServiceRoleClient();
+    const { data: branch, error: branchError } = await branchClient
+      .from("branches")
+      .select("code, name, calendar_email")
+      .eq("code", branchCode)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (branchError || !branch?.calendar_email) {
+      return NextResponse.json({ error: "Esta sucursal todavía no tiene agenda conectada." }, { status: 409 });
+    }
+
+    const calendarSlotAvailable = await isGoogleCalendarSlotAvailable(
+      payload.date,
+      payload.time,
+      branch.calendar_email,
+      branchCode
+    );
 
     if (!calendarSlotAvailable) {
       const appointmentAfterCalendarCheck = await getExistingAppointment(payload, normalizedTime);
@@ -267,14 +297,15 @@ export async function POST(request: Request) {
       p_last_name: payload.lastName,
       p_whatsapp: payload.whatsapp,
       p_appointment_date: payload.date,
-      p_appointment_time: normalizedTime
+      p_appointment_time: normalizedTime,
+      p_branch_code: branchCode
     });
 
     if (error) throw error;
 
     const createdAppointment = (data?.[0] ?? null) as PublicAppointmentResponse | null;
     const createdAppointmentId = createdAppointment?.appointment_id ?? "";
-    let adminSupabase: ReturnType<typeof createSupabaseServiceRoleClient> | null = null;
+    let adminSupabase: ReturnType<typeof createSupabaseServiceRoleClient> | null = branchClient;
     let row: AppointmentRow = {
       id: createdAppointmentId,
       first_name: payload.firstName ?? "",
@@ -282,7 +313,8 @@ export async function POST(request: Request) {
       whatsapp: payload.whatsapp ?? "",
       appointment_date: payload.date ?? "",
       appointment_time: normalizedTime,
-      status: "pending"
+      status: "pending",
+      branch_code: branchCode
     };
 
     console.info("Appointment automation setup started", {
@@ -317,7 +349,7 @@ export async function POST(request: Request) {
 
       let appointmentQuery = adminSupabase
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, brand, modality, service, origin, registro_id, cliente_id, correo, created_at, updated_at");
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_calendar_event_id, google_contact_id, resend_email_id, brand, modality, service, origin, registro_id, cliente_id, correo, branch_code, created_at, updated_at");
 
       if (createdAppointmentId) {
         appointmentQuery = appointmentQuery.eq("id", createdAppointmentId);
@@ -326,6 +358,7 @@ export async function POST(request: Request) {
           .eq("appointment_date", payload.date)
           .eq("appointment_time", normalizedTime)
           .eq("whatsapp", payload.whatsapp)
+          .eq("branch_code", branchCode)
           .order("created_at", { ascending: false })
           .limit(1);
       }
@@ -434,7 +467,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const calendarResult = await createGoogleCalendarEvent(row);
+      const calendarResult = await createGoogleCalendarEvent(row, branch.calendar_email);
       automationStatus.calendar = calendarResult.status;
 
       if (calendarResult.eventId && adminSupabase && row.id) {

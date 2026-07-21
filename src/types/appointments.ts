@@ -7,6 +7,7 @@ export type AppointmentDraft = {
   date: string;
   time: string;
   adOrigin?: string;
+  branchCode?: "SN" | "MTY_SUR";
 };
 
 export type Appointment = AppointmentDraft & {

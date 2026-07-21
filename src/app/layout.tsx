@@ -3,6 +3,7 @@ import { AuthRedirectHandler } from "@/components/AuthRedirectHandler";
 import "./globals.css";
 import "./inbox.css";
 import "./panel-navigation.css";
+import "./branch-booking.css";
 
 export const metadata: Metadata = {
   title: "Agenda Mas Sano",

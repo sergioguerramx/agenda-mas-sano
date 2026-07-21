@@ -1,6 +1,6 @@
 import { createSign } from "node:crypto";
 import { getBranchLocation } from "@/lib/branch-locations";
-import { getSlotCapacity } from "@/lib/schedule";
+import { getSlotCapacity, type ScheduleBranchCode } from "@/lib/schedule";
 import type { AppointmentRow, AppointmentStatus } from "@/types/appointments";
 
 type GoogleTokenResponse = {
@@ -392,9 +392,14 @@ export async function getGoogleCalendarSlotCounts(
   });
 }
 
-export async function isGoogleCalendarSlotAvailable(date: string, time: string, calendarIdOverride?: string) {
+export async function isGoogleCalendarSlotAvailable(
+  date: string,
+  time: string,
+  calendarIdOverride?: string,
+  branchCode: ScheduleBranchCode = "SN"
+) {
   const [slot] = await getGoogleCalendarSlotCounts(date, [time.slice(0, 5)], calendarIdOverride);
-  return (slot?.count ?? 0) < getSlotCapacity(date, time);
+  return (slot?.count ?? 0) < getSlotCapacity(date, time, branchCode);
 }
 
 export async function createGoogleCalendarEvent(

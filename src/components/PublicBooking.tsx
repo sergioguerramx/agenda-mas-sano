@@ -2,12 +2,18 @@
 
 import { CheckCircle2, Clock, MapPin, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getBranchLocation, MAS_SANO_COMMON_CONTACT } from "@/lib/branch-locations";
-import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, type ReservedSlots } from "@/lib/schedule";
+import {
+  BRANCH_OPENING_DATES,
+  BRANCH_SHORT_NAMES,
+  getBranchLocation,
+  MAS_SANO_COMMON_CONTACT,
+  type ActiveBranchCode
+} from "@/lib/branch-locations";
+import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, getSlotCapacity, type ReservedSlots } from "@/lib/schedule";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
 
-type Step = "date" | "time" | "details" | "done";
+type Step = "branch" | "date" | "time" | "details" | "done";
 type SlotCountRow = { appointment_time: string; active_count: number };
 
 const emptyDraft: AppointmentDraft = {
@@ -16,8 +22,14 @@ const emptyDraft: AppointmentDraft = {
   whatsapp: "",
   date: "",
   time: "",
-  adOrigin: "sin_identificar"
+  adOrigin: "sin_identificar",
+  branchCode: undefined
 };
+
+const branchOptions: Array<{ code: ActiveBranchCode; openingNote?: string }> = [
+  { code: "SN" },
+  { code: "MTY_SUR", openingNote: "Disponible a partir del lunes 3 de agosto" }
+];
 
 const adOriginOptions = [
   { value: "sin_identificar", label: "Sin identificar" },
@@ -38,7 +50,7 @@ const sessionIncludes = [
   "Auriculoterapia metabólica",
   "Seguimiento por WhatsApp",
   "Material de apoyo",
-  "Atención en sucursal San Nicolás"
+  "Atención en la sucursal que elijas"
 ];
 
 const howItWorks = [
@@ -59,7 +71,7 @@ const faqs = [
   },
   {
     question: "¿Dónde es la atención?",
-    answer: "En sucursal San Nicolás."
+    answer: "Puedes elegir entre San Nicolás y Monterrey Sur al iniciar tu reservación."
   },
   {
     question: "¿Qué pasa si necesito cambiar mi cita?",
@@ -68,16 +80,28 @@ const faqs = [
 ];
 
 export function PublicBooking() {
-  const [step, setStep] = useState<Step>("date");
+  const [step, setStep] = useState<Step>("branch");
   const [draft, setDraft] = useState<AppointmentDraft>(emptyDraft);
   const [reservedSlots, setReservedSlots] = useState<ReservedSlots>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [logoReady, setLogoReady] = useState(true);
-  const dates = useMemo(() => buildAvailableDates(new Date()), []);
-  const slots = useMemo(() => (draft.date ? buildSlotsForDate(draft.date, new Date(), reservedSlots) : []), [draft.date, reservedSlots]);
-  const location = useMemo(() => getBranchLocation("SN", draft.date || undefined), [draft.date]);
+  const dates = useMemo(() => {
+    const openingDate = draft.branchCode ? BRANCH_OPENING_DATES[draft.branchCode] : null;
+    return buildAvailableDates(new Date()).map((date) => ({
+      ...date,
+      closed: date.closed || Boolean(openingDate && date.iso < openingDate)
+    }));
+  }, [draft.branchCode]);
+  const slots = useMemo(() => (
+    draft.date && draft.branchCode
+      ? buildSlotsForDate(draft.date, new Date(), reservedSlots, draft.branchCode)
+      : []
+  ), [draft.branchCode, draft.date, reservedSlots]);
+  const location = useMemo(() => (
+    draft.branchCode ? getBranchLocation(draft.branchCode, draft.date || undefined) : null
+  ), [draft.branchCode, draft.date]);
   const selectedDate = dates.find((date) => date.iso === draft.date);
   const selectedSlot = slots.find((slot) => slot.time === draft.time);
 
@@ -87,29 +111,35 @@ export function PublicBooking() {
     const nameParts = fullName ? fullName.split(" ") : [];
     const whatsapp = params.get("whatsapp")?.trim() ?? "";
     const adOrigin = params.get("adOrigin")?.trim() ?? "";
+    const branchParam = params.get("branch")?.trim().toUpperCase() ?? "";
+    const branchCode = branchParam === "SN" || branchParam === "MTY_SUR" ? branchParam : undefined;
 
-    if (!fullName && !whatsapp && !adOrigin) return;
+    if (!fullName && !whatsapp && !adOrigin && !branchCode) return;
 
     setDraft((current) => ({
       ...current,
       firstName: nameParts[0] ?? current.firstName,
       lastName: nameParts.slice(1).join(" ") || current.lastName,
       whatsapp: whatsapp || current.whatsapp,
-      adOrigin: adOriginOptions.some((option) => option.value === adOrigin) ? adOrigin : current.adOrigin
+      adOrigin: adOriginOptions.some((option) => option.value === adOrigin) ? adOrigin : current.adOrigin,
+      branchCode: branchCode ?? current.branchCode
     }));
+    if (branchCode) setStep("date");
   }, []);
 
   useEffect(() => {
     let ignore = false;
 
     async function loadReservedSlots() {
-      if (!draft.date) return;
+      if (!draft.date || !draft.branchCode) return;
 
       setLoadingSlots(true);
       setError("");
 
       try {
-        const response = await fetch(`/api/calendar/availability?date=${encodeURIComponent(draft.date)}`);
+        const response = await fetch(
+          `/api/calendar/availability?date=${encodeURIComponent(draft.date)}&branch=${encodeURIComponent(draft.branchCode)}`
+        );
 
         if (!response.ok) {
           const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -128,8 +158,8 @@ export function PublicBooking() {
       } catch (calendarError) {
         if (!ignore) {
           const blockedSlots: ReservedSlots = {};
-          buildSlotsForDate(draft.date, new Date()).forEach((slot) => {
-            blockedSlots[slot.time] = 2;
+          buildSlotsForDate(draft.date, new Date(), {}, draft.branchCode).forEach((slot) => {
+            blockedSlots[slot.time] = getSlotCapacity(draft.date, slot.time, draft.branchCode!);
           });
           console.error("Google Calendar availability error", {
             message: calendarError instanceof Error ? calendarError.message : "No se pudo cargar Calendar."
@@ -147,7 +177,7 @@ export function PublicBooking() {
     return () => {
       ignore = true;
     };
-  }, [draft.date]);
+  }, [draft.branchCode, draft.date]);
 
   async function confirm() {
     const whatsapp = normalizeMexicanWhatsapp(draft.whatsapp);
@@ -159,6 +189,11 @@ export function PublicBooking() {
 
     if (!whatsapp) {
       setError("Escribe un WhatsApp mexicano válido de 10 dígitos.");
+      return;
+    }
+
+    if (!draft.branchCode) {
+      setError("Elige una sucursal para continuar.");
       return;
     }
 
@@ -181,7 +216,8 @@ export function PublicBooking() {
           whatsapp,
           date: draft.date,
           time: draft.time,
-          adOrigin: draft.adOrigin
+          adOrigin: draft.adOrigin,
+          branchCode: draft.branchCode
         })
       });
 
@@ -201,7 +237,7 @@ export function PublicBooking() {
 
   const waPhone = process.env.NEXT_PUBLIC_WHATSAPP_PHONE ?? MAS_SANO_COMMON_CONTACT.whatsapp.replace(/\D/g, "");
   const waText = encodeURIComponent(
-    `Hola, confirmé mi cita en Más Sano para ${selectedDate?.label ?? ""} a las ${selectedSlot?.label ?? ""}.`
+    `Hola, confirmé mi cita en Más Sano ${draft.branchCode ? BRANCH_SHORT_NAMES[draft.branchCode] : ""} para ${selectedDate?.label ?? ""} a las ${selectedSlot?.label ?? ""}.`
   );
 
   return (
@@ -236,11 +272,18 @@ export function PublicBooking() {
               <a className="primary hero-cta" href="#agenda">Elegir horario</a>
             </div>
 
-            <a className="location-chip" href={location.mapsUrl} target="_blank" rel="noopener noreferrer">
-              <MapPin size={18} />
-              <span><strong>Sucursal San Nicolás · {location.label}</strong><small>{location.address}</small></span>
-              <em>Ver mapa</em>
-            </a>
+            {location && draft.branchCode ? (
+              <a className="location-chip" href={location.mapsUrl} target="_blank" rel="noopener noreferrer">
+                <MapPin size={18} />
+                <span><strong>Sucursal {BRANCH_SHORT_NAMES[draft.branchCode]} · {location.label}</strong><small>{location.address}</small></span>
+                <em>Ver mapa</em>
+              </a>
+            ) : (
+              <div className="location-chip">
+                <MapPin size={18} />
+                <span><strong>Dos sucursales disponibles</strong><small>San Nicolás y Monterrey Sur</small></span>
+              </div>
+            )}
 
             <section className="info-block includes-block">
               <h3>Qué incluye tu sesión de $399</h3>
@@ -267,6 +310,7 @@ export function PublicBooking() {
           <section className="card booking-card" id="agenda">
             <div className="steps">
               {[
+                ["branch", "Sucursal"],
                 ["date", "Fecha"],
                 ["time", "Horario"],
                 ["details", "Datos"],
@@ -277,10 +321,38 @@ export function PublicBooking() {
             </div>
 
             <div className="content">
+              {step === "branch" && (
+                <section>
+                  <h3>Elige tu sucursal</h3>
+                  <p className="copy">Selecciona dónde quieres recibir tu sesión.</p>
+                  <div className="branch-grid">
+                    {branchOptions.map((branch) => {
+                      const branchLocation = getBranchLocation(branch.code);
+                      return (
+                        <button
+                          className={`choice branch-choice ${draft.branchCode === branch.code ? "selected" : ""}`}
+                          key={branch.code}
+                          onClick={() => {
+                            setDraft({ ...draft, branchCode: branch.code, date: "", time: "" });
+                            setReservedSlots({});
+                            setError("");
+                            setStep("date");
+                          }}
+                          type="button"
+                        >
+                          <MapPin size={20} />
+                          <span><strong>{BRANCH_SHORT_NAMES[branch.code]}</strong><small>{branchLocation.address}</small>{branch.openingNote && <em>{branch.openingNote}</em>}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               {step === "date" && (
                 <section>
                   <h3>Selecciona fecha</h3>
-                  <p className="copy">Miércoles y domingo permanecen cerrados.</p>
+                  <p className="copy">{draft.branchCode ? `Sucursal ${BRANCH_SHORT_NAMES[draft.branchCode]}. ` : ""}Miércoles y domingo permanecen cerrados.</p>
                   <div className="grid">
                     {dates.map((date) => (
                       <button
@@ -295,10 +367,11 @@ export function PublicBooking() {
                         type="button"
                       >
                         <strong>{date.shortLabel}</strong>
-                        <span>{date.closed ? "Cerrado" : date.label}</span>
+                        <span>{date.closed ? (draft.branchCode === "MTY_SUR" && date.iso < BRANCH_OPENING_DATES.MTY_SUR! ? "Disponible desde 3 ago" : "Cerrado") : date.label}</span>
                       </button>
                     ))}
                   </div>
+                  <div className="actions"><button className="secondary" onClick={() => setStep("branch")} type="button">Cambiar sucursal</button></div>
                 </section>
               )}
 
@@ -340,7 +413,7 @@ export function PublicBooking() {
                     <div className="field"><label htmlFor="whatsapp">WhatsApp</label><input id="whatsapp" inputMode="tel" placeholder="+52 55 1234 5678" value={draft.whatsapp} onChange={(event) => setDraft({ ...draft, whatsapp: event.target.value })} /></div>
                     <div className="field"><label htmlFor="adOrigin">Origen de la cita</label><select id="adOrigin" value={draft.adOrigin} onChange={(event) => setDraft({ ...draft, adOrigin: event.target.value })}>{adOriginOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
                   </div>
-                  <div className="summary"><div className="row"><span>Fecha</span><strong>{draft.date ? formatDisplayDate(draft.date) : ""}</strong></div><div className="row"><span>Hora</span><strong>{draft.time}</strong></div></div>
+                  <div className="summary"><div className="row"><span>Sucursal</span><strong>{draft.branchCode ? BRANCH_SHORT_NAMES[draft.branchCode] : ""}</strong></div><div className="row"><span>Fecha</span><strong>{draft.date ? formatDisplayDate(draft.date) : ""}</strong></div><div className="row"><span>Hora</span><strong>{draft.time}</strong></div></div>
                   {error && <p className="error">{error}</p>}
                   <div className="actions"><button className="primary" disabled={saving} onClick={confirm} type="button"><CheckCircle2 size={18} />{saving ? "Guardando..." : "Confirmar cita"}</button><button className="secondary" onClick={() => { setError(""); setStep("time"); }} type="button">Cambiar horario</button></div>
                 </section>
@@ -351,8 +424,8 @@ export function PublicBooking() {
                   <CheckCircle2 size={42} />
                   <h2>Cita solicitada</h2>
                   <p className="copy">Recibimos tu solicitud. El equipo de Más Sano le dará seguimiento por WhatsApp.</p>
-                  <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div><div className="row"><span>Lugar</span><strong>{location.address}</strong></div></div>
-                  <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a><a className="secondary" href={location.mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin size={18} />Ver ubicación</a><button className="secondary" onClick={() => { setDraft(emptyDraft); setStep("date"); }} type="button">Nueva cita</button></div>
+                  <div className="summary"><div className="row"><span>Paciente</span><strong>{draft.firstName} {draft.lastName}</strong></div><div className="row"><span>Sucursal</span><strong>{draft.branchCode ? BRANCH_SHORT_NAMES[draft.branchCode] : ""}</strong></div><div className="row"><span>Fecha</span><strong>{selectedDate?.label}</strong></div><div className="row"><span>Hora</span><strong>{selectedSlot?.label}</strong></div><div className="row"><span>WhatsApp</span><strong>{draft.whatsapp}</strong></div><div className="row"><span>Lugar</span><strong>{location?.address}</strong></div></div>
+                  <div className="actions"><a className="primary" href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"><MessageCircle size={18} />Abrir WhatsApp</a>{location && <a className="secondary" href={location.mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin size={18} />Ver ubicación</a>}<button className="secondary" onClick={() => { setDraft(emptyDraft); setReservedSlots({}); setStep("branch"); }} type="button">Nueva cita</button></div>
                 </section>
               )}
             </div>

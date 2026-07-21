@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const baseSlots = buildSlotsForDate(date, new Date());
+    const baseSlots = buildSlotsForDate(date, new Date(), {}, branchCode as "SN" | "MTY_SUR");
     const counts = await getGoogleCalendarSlotCounts(
       date,
       baseSlots.map((slot) => slot.time),
@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
     const slots = buildSlotsForDate(
       date,
       new Date(),
-      Object.fromEntries(counts.map((item) => [item.time, item.count]))
+      Object.fromEntries(counts.map((item) => [item.time, item.count])),
+      branchCode as "SN" | "MTY_SUR"
     );
 
     return NextResponse.json({

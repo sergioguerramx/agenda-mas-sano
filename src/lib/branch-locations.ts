@@ -24,6 +24,11 @@ export const BRANCH_SHORT_NAMES: Record<ActiveBranchCode, string> = {
   MTY_SUR: "Monterrey Sur"
 };
 
+export const BRANCH_OPENING_DATES: Record<ActiveBranchCode, string | null> = {
+  SN: null,
+  MTY_SUR: "2026-08-03"
+};
+
 const SAN_NICOLAS_MOVE_DATE = "2026-08-02";
 
 const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
@@ -41,7 +46,7 @@ const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
   ],
   MTY_SUR: [{
     label: "Distrito Tec",
-    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec. Atrás del Teatro Nena Delgado.",
+    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec. Referencia: atrás del Teatro Nena Delgado.",
     mapsUrl: "https://maps.app.goo.gl/gVdFZaETS4RWCbyNA"
   }]
 };

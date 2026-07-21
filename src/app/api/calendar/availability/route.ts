@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { BRANCH_OPENING_DATES, type ActiveBranchCode } from "@/lib/branch-locations";
 import { buildSlotsForDate } from "@/lib/schedule";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { getGoogleCalendarSlotCounts } from "@/services/google-calendar";
+
+const BRANCH_CODES = new Set<ActiveBranchCode>(["SN", "MTY_SUR"]);
 
 function getErrorDetails(error: unknown) {
   if (!error || typeof error !== "object") {
@@ -19,14 +23,32 @@ function getErrorDetails(error: unknown) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") ?? "";
+  const branchCode = (searchParams.get("branch") ?? "SN") as ActiveBranchCode;
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ error: "Fecha invalida." }, { status: 400 });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !BRANCH_CODES.has(branchCode)) {
+    return NextResponse.json({ error: "Elige una sucursal y fecha válidas." }, { status: 400 });
+  }
+
+  const openingDate = BRANCH_OPENING_DATES[branchCode];
+  if (openingDate && date < openingDate) {
+    return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
   }
 
   try {
-    const slots = buildSlotsForDate(date, new Date()).map((slot) => slot.time);
-    const counts = await getGoogleCalendarSlotCounts(date, slots);
+    const client = createSupabaseServiceRoleClient();
+    const { data: branch, error: branchError } = await client
+      .from("branches")
+      .select("code, calendar_email")
+      .eq("code", branchCode)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (branchError || !branch?.calendar_email) {
+      return NextResponse.json({ error: "Esta sucursal todavía no tiene agenda conectada." }, { status: 409 });
+    }
+
+    const slots = buildSlotsForDate(date, new Date(), {}, branchCode).map((slot) => slot.time);
+    const counts = await getGoogleCalendarSlotCounts(date, slots, branch.calendar_email);
 
     return NextResponse.json(
       counts.map((slot) => ({
@@ -35,7 +57,7 @@ export async function GET(request: Request) {
       }))
     );
   } catch (error) {
-    console.error("Google Calendar availability error", getErrorDetails(error));
+    console.error("Google Calendar availability error", { branchCode, ...getErrorDetails(error) });
 
     return NextResponse.json(
       { error: "No se pudieron cargar los horarios reales de Google Calendar." },

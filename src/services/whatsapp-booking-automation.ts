@@ -14,6 +14,7 @@ import {
   getGoogleCalendarSlotCounts,
   isGoogleCalendarSlotAvailable
 } from "@/services/google-calendar";
+import { upsertGoogleContact } from "@/services/google-contacts";
 import type { AppointmentRow } from "@/types/appointments";
 
 type BookingStep = "awaiting_branch" | "awaiting_day_shift" | "awaiting_time" | "awaiting_name";
@@ -346,9 +347,14 @@ async function getAvailableSlots(client: SupabaseClient, branchCode: BranchCode,
     .maybeSingle();
   if (!branch?.calendar_email) throw new Error("La agenda de la sucursal no está conectada.");
 
-  const base = buildSlotsForDate(date, new Date());
+  const base = buildSlotsForDate(date, new Date(), {}, branchCode);
   const counts = await getGoogleCalendarSlotCounts(date, base.map((slot) => slot.time), branch.calendar_email);
-  const slots = buildSlotsForDate(date, new Date(), Object.fromEntries(counts.map((item) => [item.time, item.count])));
+  const slots = buildSlotsForDate(
+    date,
+    new Date(),
+    Object.fromEntries(counts.map((item) => [item.time, item.count])),
+    branchCode
+  );
   return slots.filter((slot) => slot.available && matchesShift(slot.time, shift));
 }
 
@@ -458,7 +464,7 @@ async function createAutomaticAppointment(
     .eq("is_active", true)
     .maybeSingle();
   if (!branch?.calendar_email) throw new Error("La agenda de la sucursal no está conectada.");
-  const stillAvailable = await isGoogleCalendarSlotAvailable(date, time, branch.calendar_email);
+  const stillAvailable = await isGoogleCalendarSlotAvailable(date, time, branch.calendar_email, branchCode);
   if (!stillAvailable) return { status: "occupied" as const };
 
   const { firstName, lastName } = splitName(fullName);
@@ -495,6 +501,16 @@ async function createAutomaticAppointment(
     await syncContactFromAppointment(client, appointment.id);
   } catch (error) {
     console.warn("La cita se creó, pero el resumen del contacto quedó pendiente", error);
+  }
+
+  try {
+    const googleContact = await upsertGoogleContact(appointment);
+    if (googleContact.resourceName) {
+      await client.from("appointments").update({ google_contact_id: googleContact.resourceName }).eq("id", appointment.id);
+      await client.from("contacts").update({ google_contact_resource_name: googleContact.resourceName }).eq("whatsapp", appointment.whatsapp);
+    }
+  } catch (error) {
+    console.warn("La cita se creó, pero Google Contacts quedó pendiente", error);
   }
 
   await updateAutomation(client, conversation.id, null, { appointmentId: appointment.id }, {
