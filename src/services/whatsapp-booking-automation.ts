@@ -333,7 +333,7 @@ function parseDateAndShift(body: string, branchCode?: BranchCode) {
 
 function matchesShift(time: string, shift: Shift) {
   const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-  return shift === "morning" ? minutes <= 13 * 60 + 20 : minutes >= 13 * 60 + 40;
+  return shift === "morning" ? minutes <= 13 * 60 + 20 : minutes >= 13 * 60;
 }
 
 async function getAvailableSlots(client: SupabaseClient, branchCode: BranchCode, date: string, shift: Shift) {
