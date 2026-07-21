@@ -4,6 +4,7 @@ import { Copy, Download, LogIn, MessageCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { isAllowedAdminEmail } from "@/lib/admin";
+import { BRANCH_SHORT_NAMES, type ActiveBranchCode } from "@/lib/branch-locations";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { Appointment, AppointmentRow, AppointmentStatus, Contact, ContactRow } from "@/types/appointments";
 
@@ -99,7 +100,8 @@ function toAppointment(row: AppointmentRow): Appointment {
     origin: row.origin,
     registroId: row.registro_id,
     clienteId: row.cliente_id,
-    correo: row.correo
+    correo: row.correo,
+    branchCode: row.branch_code ?? undefined
   };
 }
 
@@ -165,6 +167,11 @@ function formatContactName(firstName: string, lastName: string) {
 
 function getGoogleContactsLabel(value?: string | null) {
   return value ? "Registrado en Google Contacts" : "Pendiente en Google Contacts";
+}
+
+function getBranchLabel(value?: string | null) {
+  if (value === "SN" || value === "MTY_SUR") return BRANCH_SHORT_NAMES[value];
+  return value || "Sin identificar";
 }
 
 function getAppointmentTypeLabel(item: Appointment) {
@@ -237,11 +244,13 @@ export function PanelDashboard() {
   const [appointmentDateTo, setAppointmentDateTo] = useState("");
   const [registrationDateFrom, setRegistrationDateFrom] = useState(getTodayInTimeZone);
   const [registrationDateTo, setRegistrationDateTo] = useState(getTodayInTimeZone);
+  const [branchFilter, setBranchFilter] = useState<"" | ActiveBranchCode>("");
   const [view, setView] = useState<PanelView>("appointments");
   const [items, setItems] = useState<Appointment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactSearch, setContactSearch] = useState("");
   const [contactDate, setContactDate] = useState("");
+  const [contactBranchFilter, setContactBranchFilter] = useState<"" | ActiveBranchCode>("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -272,9 +281,10 @@ export function PanelDashboard() {
       const registrationDate = getRegistrationDate(item.createdAt);
       const matchesAppointmentDate = isDateInRange(item.date, appointmentDateFrom, appointmentDateTo);
       const matchesRegistrationDate = isDateInRange(registrationDate, registrationDateFrom, registrationDateTo);
-      return matchesAppointmentDate && matchesRegistrationDate;
+      const matchesBranch = !branchFilter || item.branchCode === branchFilter;
+      return matchesAppointmentDate && matchesRegistrationDate && matchesBranch;
     }),
-    [items, appointmentDateFrom, appointmentDateTo, registrationDateFrom, registrationDateTo]
+    [items, appointmentDateFrom, appointmentDateTo, registrationDateFrom, registrationDateTo, branchFilter]
   );
 
   const appointmentReportSummary = useMemo(
@@ -291,16 +301,17 @@ export function PanelDashboard() {
     return contacts.filter((contact) => {
       const matchesSearch = !search || `${contact.firstName} ${contact.lastName} ${contact.whatsapp}`.toLowerCase().includes(search);
       const matchesDate = !contactDate || contact.lastAppointmentDate === contactDate || contact.firstAppointmentDate === contactDate;
-      return matchesSearch && matchesDate;
+      const matchesBranch = !contactBranchFilter || contact.branch === contactBranchFilter;
+      return matchesSearch && matchesDate && matchesBranch;
     });
-  }, [contacts, contactDate, contactSearch]);
+  }, [contacts, contactBranchFilter, contactDate, contactSearch]);
 
   const loadAppointments = useCallback(async (client: SupabaseClient) => {
     setMessage("");
     const { data, error } = await withPanelTimeout(
       client
         .from("appointments")
-        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_contact_id, brand, modality, service, origin, registro_id, cliente_id, correo, created_at")
+        .select("id, first_name, last_name, whatsapp, appointment_date, appointment_time, status, google_contact_id, brand, modality, service, origin, registro_id, cliente_id, correo, branch_code, created_at")
         .order("created_at", { ascending: false })
         .order("appointment_date", { ascending: true })
         .order("appointment_time", { ascending: true }),
@@ -445,6 +456,7 @@ export function PanelDashboard() {
     setAppointmentDateTo("");
     setRegistrationDateFrom("");
     setRegistrationDateTo("");
+    setBranchFilter("");
   }
 
   function exportAppointments() {
@@ -469,6 +481,7 @@ export function PanelDashboard() {
           Tipo: getAppointmentTypeLabel(item),
           Servicio: getServiceLabel(item),
           "Origen de cita": getAdOriginLabel(item.origin),
+          Sucursal: getBranchLabel(item.branchCode),
           Correo: item.correo ?? "",
           Estado: labels[item.status],
           "Total de citas del contacto": contact?.totalAppointments ?? history.length,
@@ -515,7 +528,23 @@ export function PanelDashboard() {
           {view === "appointments" && (
             <>
               <div className="list">
-                <article className="apt">
+                <article className="apt filter-section">
+                  <div>
+                    <strong>Sucursal</strong>
+                    <p className="copy">Elige una sucursal o consulta todas las citas juntas.</p>
+                    <div className="filters">
+                      <div className="field">
+                        <label htmlFor="branchFilter">Mostrar citas de</label>
+                        <select id="branchFilter" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value as "" | ActiveBranchCode)}>
+                          <option value="">Todas las sucursales</option>
+                          <option value="SN">San Nicolás</option>
+                          <option value="MTY_SUR">Monterrey Sur</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+                <article className="apt filter-section">
                   <div>
                     <strong>Fecha de la cita</strong>
                     <p className="copy">Usa este filtro para revisar que citas estan programadas para asistir entre estas fechas.</p>
@@ -525,7 +554,7 @@ export function PanelDashboard() {
                     </div>
                   </div>
                 </article>
-                <article className="apt">
+                <article className="apt filter-section">
                   <div>
                     <strong>Fecha en que se agendo</strong>
                     <p className="copy">Usa este filtro para medir cuantas citas se registraron en un periodo. Es el mas util para reportes de publicidad.</p>
@@ -558,6 +587,7 @@ export function PanelDashboard() {
                         <strong>Cita para: {item.date} - {item.time}</strong>
                         <p className="copy"><strong>{formatContactName(item.firstName, item.lastName)}</strong></p>
                         <p className="copy">Tipo: {getAppointmentTypeLabel(item)} - {getServiceLabel(item)}</p>
+                        <p className="copy">Sucursal: {getBranchLabel(item.branchCode)}</p>
                         <p className="copy">Origen de cita: {getAdOriginLabel(item.origin)}</p>
                         <p className="copy">Agendada el: {getRegistrationLabel(item.createdAt)}</p>
                         <p className="copy">WhatsApp: {item.whatsapp}</p>
@@ -582,6 +612,7 @@ export function PanelDashboard() {
               <div className="filters">
                 <div className="field"><label htmlFor="contactSearch">Buscar</label><input id="contactSearch" type="search" placeholder="Nombre, apellido o WhatsApp" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} /></div>
                 <div className="field"><label htmlFor="contactDateFilter">Fecha</label><input id="contactDateFilter" type="date" value={contactDate} onChange={(event) => setContactDate(event.target.value)} /></div>
+                <div className="field"><label htmlFor="contactBranchFilter">Sucursal</label><select id="contactBranchFilter" value={contactBranchFilter} onChange={(event) => setContactBranchFilter(event.target.value as "" | ActiveBranchCode)}><option value="">Todas las sucursales</option><option value="SN">San Nicolás</option><option value="MTY_SUR">Monterrey Sur</option></select></div>
               </div>
               <div className="actions"><button className="secondary" onClick={exportContacts} type="button"><Download size={17} />Exportar CSV</button></div>
               <div className="list">

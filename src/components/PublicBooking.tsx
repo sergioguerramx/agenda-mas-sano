@@ -28,7 +28,7 @@ const emptyDraft: AppointmentDraft = {
 
 const branchOptions: Array<{ code: ActiveBranchCode; openingNote?: string }> = [
   { code: "SN" },
-  { code: "MTY_SUR", openingNote: "Disponible a partir del lunes 3 de agosto" }
+  { code: "MTY_SUR", openingNote: "Nueva sucursal · Apertura 3 de agosto" }
 ];
 
 const adOriginOptions = [
@@ -319,6 +319,17 @@ export function PublicBooking() {
                 <button className={step === key ? "active" : ""} key={key} type="button">{label}</button>
               ))}
             </div>
+
+            {draft.branchCode && location && step !== "branch" && step !== "done" && (
+              <div className="booking-branch-status">
+                <MapPin size={18} />
+                <span>
+                  <strong>Sucursal {BRANCH_SHORT_NAMES[draft.branchCode]}</strong>
+                  <small>{location.address}</small>
+                </span>
+                <button onClick={() => setStep("branch")} type="button">Cambiar</button>
+              </div>
+            )}
 
             <div className="content">
               {step === "branch" && (
