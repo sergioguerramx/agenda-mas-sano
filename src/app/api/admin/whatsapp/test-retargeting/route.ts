@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const templateName = branchCode === "MTY_SUR"
-    ? "mas_sano_reactivacion_mty_sur_449_v2"
+    ? "mas_sano_reactivacion_poniente_449_v1"
     : "mas_sano_reactivacion_san_nicolas_449_v2";
 
   try {

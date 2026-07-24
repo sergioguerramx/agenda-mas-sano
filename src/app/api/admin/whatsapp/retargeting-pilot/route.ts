@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 const PILOT_SIZE = 25;
 const CAMPAIGN_NAME = "Piloto Monterrey Poniente 2026-07-21 bloque 1";
-const TEMPLATE_NAME = "mas_sano_reactivacion_mty_sur_449_v2";
+const TEMPLATE_NAME = "mas_sano_reactivacion_poniente_449_v1";
 const SOURCE_BRANCHES = ["MTY_SUR", "GPE_CENTRO", "GPE_LINDAVISTA"];
 const INTERNAL_NUMBERS = new Set([
   "+528186935634",
