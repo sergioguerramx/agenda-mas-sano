@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAdminEmail } from "@/lib/admin-auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { syncGoogleCalendarEventStatus } from "@/services/google-calendar";
+import { deleteGoogleContactsByPhone } from "@/services/google-contacts";
 import type { AppointmentRow } from "@/types/appointments";
 
 export const runtime = "nodejs";
@@ -125,6 +126,7 @@ export async function DELETE(request: NextRequest) {
     const records = await getTestRecords();
     const calendarByBranch = new Map(records.branches.map((branch) => [branch.code, branch.calendar_email]));
     let calendarEventsDeleted = 0;
+    let googleContactsDeleted = 0;
 
     for (const appointment of records.appointments) {
       if (!appointment.google_calendar_event_id) continue;
@@ -175,6 +177,9 @@ export async function DELETE(request: NextRequest) {
       .eq("whatsapp", TEST_WHATSAPP);
     if (contactError) throw contactError;
 
+    cleanupStage = "Google Contacts";
+    googleContactsDeleted = await deleteGoogleContactsByPhone(TEST_WHATSAPP);
+
     cleanupStage = "conversación de prueba";
     const { error: conversationError } = await records.client
       .from("whatsapp_conversations")
@@ -191,6 +196,7 @@ export async function DELETE(request: NextRequest) {
         appointments: records.appointments.length,
         calendarEvents: calendarEventsDeleted,
         contacts: records.contacts.length,
+        googleContacts: googleContactsDeleted,
         patientProfiles: records.testPatients.length,
         historicalProfilesPreserved: records.patients.length - records.testPatients.length
       }

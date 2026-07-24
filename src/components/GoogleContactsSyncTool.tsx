@@ -26,6 +26,15 @@ type SyncResult = {
   error?: string;
 };
 
+type TestContactResult = {
+  success?: boolean;
+  whatsapp?: string;
+  count?: number;
+  deleted?: number;
+  contacts?: Array<{ resourceName: string; displayName: string; phoneNumbers: string[] }>;
+  error?: string;
+};
+
 function getPanelRedirectUrl() {
   const browserOrigin = window.location.origin.replace(/\/+$/, "");
   const envSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
@@ -57,6 +66,25 @@ async function syncPendingContacts(session: Session) {
   return body;
 }
 
+async function reviewTestContact(session: Session) {
+  const response = await fetch("/api/admin/google-contacts/test-contact", {
+    headers: { authorization: `Bearer ${session.access_token}` }
+  });
+  const body = (await response.json()) as TestContactResult;
+  if (!response.ok) throw new Error(body.error || "No se pudo revisar el contacto de prueba.");
+  return body;
+}
+
+async function deleteTestContact(session: Session) {
+  const response = await fetch("/api/admin/google-contacts/test-contact", {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${session.access_token}` }
+  });
+  const body = (await response.json()) as TestContactResult;
+  if (!response.ok) throw new Error(body.error || "No se pudo borrar el contacto de prueba.");
+  return body;
+}
+
 export function GoogleContactsSyncTool() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -66,6 +94,7 @@ export function GoogleContactsSyncTool() {
   const [message, setMessage] = useState("");
   const [account, setAccount] = useState<AccountStatus | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [testContact, setTestContact] = useState<TestContactResult | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -151,6 +180,44 @@ export function GoogleContactsSyncTool() {
     }
   }
 
+  async function reviewTest() {
+    if (!session) return;
+    setRunning(true);
+    setMessage("");
+
+    try {
+      const nextResult = await reviewTestContact(session);
+      setTestContact(nextResult);
+      setMessage(nextResult.count
+        ? `Encontramos ${nextResult.count} contacto${nextResult.count === 1 ? "" : "s"} de prueba.`
+        : "No encontramos contactos de prueba en Google Contacts.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo revisar el contacto de prueba.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function removeTest() {
+    if (!session) return;
+    if (!window.confirm("¿Deseas borrar de Google Contacts todos los registros asociados al número de prueba 81 1474 0974?")) return;
+
+    setRunning(true);
+    setMessage("");
+
+    try {
+      const nextResult = await deleteTestContact(session);
+      setTestContact({ ...nextResult, count: 0, contacts: [] });
+      setMessage(nextResult.deleted
+        ? `Se borraron ${nextResult.deleted} contacto${nextResult.deleted === 1 ? "" : "s"} de prueba.`
+        : "No había contactos de prueba por borrar.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo borrar el contacto de prueba.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="page">
@@ -217,6 +284,22 @@ export function GoogleContactsSyncTool() {
               {result.errors?.length ? <p className="error">{result.errors[0].reason}</p> : null}
             </div>
           ) : null}
+          <div className="summary">
+            <div className="row"><span>Número usado en pruebas</span><strong>81 1474 0974</strong></div>
+            <div className="actions">
+              <button className="secondary" type="button" disabled={running} onClick={reviewTest}>
+                Revisar contacto de prueba
+              </button>
+              <button className="secondary" type="button" disabled={running} onClick={removeTest}>
+                Borrar contacto de prueba
+              </button>
+            </div>
+            {testContact?.contacts?.length ? (
+              <p className="copy">
+                {testContact.contacts.map((contact) => contact.displayName || contact.phoneNumbers[0]).join(", ")}
+              </p>
+            ) : null}
+          </div>
         </div>
       </section>
     </main>

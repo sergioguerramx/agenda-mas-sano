@@ -38,6 +38,12 @@ type GoogleContactResult = {
   reason?: string;
 };
 
+export type GoogleContactMatch = {
+  resourceName: string;
+  displayName: string;
+  phoneNumbers: string[];
+};
+
 type GoogleContactsAccountResult = {
   configured: boolean;
   connected: boolean;
@@ -211,17 +217,43 @@ function buildContactPerson(appointment: AppointmentRow, existing?: GooglePerson
 }
 
 async function searchGoogleContactByPhone(whatsapp: string) {
+  const matches = await findGoogleContactsByPhone(whatsapp);
+  return matches[0]?.person ?? null;
+}
+
+async function findGoogleContactsByPhone(whatsapp: string) {
   const readMask = "names,phoneNumbers,metadata,memberships,userDefined";
   await callPeopleApi(`/people:searchContacts?query=&readMask=${encodeURIComponent(readMask)}`);
 
   const body = await callPeopleApi(
-    `/people:searchContacts?query=${encodeURIComponent(whatsapp)}&readMask=${encodeURIComponent(readMask)}`
+    `/people:searchContacts?query=${encodeURIComponent(whatsapp)}&readMask=${encodeURIComponent(readMask)}&pageSize=30`
   ) as GooglePeopleResponse;
   const targetPhone = normalizePhone(whatsapp);
 
-  return body.results
-    ?.map((result) => result.person)
-    .find((person) => person?.phoneNumbers?.some((phone) => normalizePhone(phone.value ?? "") === targetPhone)) ?? null;
+  return (body.results ?? [])
+    .map((result) => result.person)
+    .filter((person): person is GooglePerson => Boolean(
+      person?.resourceName
+      && person.phoneNumbers?.some((phone) => normalizePhone(phone.value ?? "") === targetPhone)
+    ))
+    .map((person) => ({ person, resourceName: person.resourceName as string }));
+}
+
+export async function getGoogleContactsByPhone(whatsapp: string): Promise<GoogleContactMatch[]> {
+  const matches = await findGoogleContactsByPhone(whatsapp);
+  return matches.map(({ person, resourceName }) => ({
+    resourceName,
+    displayName: person.names?.[0]?.displayName ?? "",
+    phoneNumbers: (person.phoneNumbers ?? []).map((phone) => phone.value ?? "").filter(Boolean)
+  }));
+}
+
+export async function deleteGoogleContactsByPhone(whatsapp: string) {
+  const matches = await findGoogleContactsByPhone(whatsapp);
+  for (const { resourceName } of matches) {
+    await callPeopleApi(`/${resourceName}:deleteContact`, { method: "DELETE" });
+  }
+  return matches.length;
 }
 
 export async function getGoogleContactsAccountInfo(): Promise<GoogleContactsAccountResult> {
