@@ -7,6 +7,7 @@ const MAX_DAYS_AHEAD = 15;
 const MIN_ADVANCE_MINUTES = 30;
 const DEFAULT_APPOINTMENTS_PER_SLOT = 2;
 const SATURDAY_EXTRA_APPOINTMENTS_PER_SLOT = 3;
+const NEW_BRANCH_CAPACITY_START_DATE = "2026-08-03";
 const TIME_ZONE = "America/Monterrey";
 const weekdays = new Intl.DateTimeFormat("es-MX", { weekday: "long", timeZone: "UTC" });
 const dates = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", timeZone: "UTC" });
@@ -49,6 +50,7 @@ export function buildSlotsForDate(
 }
 
 export function getSlotCapacity(dateIso: string, time: string, branchCode: ScheduleBranchCode = "SN") {
+  if (dateIso >= NEW_BRANCH_CAPACITY_START_DATE) return time.endsWith(":20") ? 2 : 1;
   if (branchCode === "MTY_SUR") return time.endsWith(":20") ? 2 : 1;
   if (getDayOfWeek(dateIso) === 6 && isSaturdayExtraCapacitySlot(time)) return SATURDAY_EXTRA_APPOINTMENTS_PER_SLOT;
   return DEFAULT_APPOINTMENTS_PER_SLOT;

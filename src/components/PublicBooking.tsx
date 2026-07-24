@@ -10,6 +10,7 @@ import {
   SAN_NICOLAS_MOVE_DATE,
   type ActiveBranchCode
 } from "@/lib/branch-locations";
+import { getCurrentMasSanoOffer, getMasSanoAppointmentOffer } from "@/lib/mas-sano-pricing";
 import { buildAvailableDates, buildSlotsForDate, formatDisplayDate, getSlotCapacity, type ReservedSlots } from "@/lib/schedule";
 import { normalizeMexicanWhatsapp } from "@/lib/whatsapp";
 import type { AppointmentDraft } from "@/types/appointments";
@@ -111,6 +112,9 @@ export function PublicBooking() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [logoReady, setLogoReady] = useState(true);
+  const displayedOffer = draft.date
+    ? getMasSanoAppointmentOffer(draft.date)
+    : getCurrentMasSanoOffer();
   const dates = useMemo(() => {
     const openingDate = draft.branchCode ? BRANCH_OPENING_DATES[draft.branchCode] : null;
     return buildAvailableDates(getBookingDatesStart(draft.branchCode)).map((date) => ({
@@ -305,7 +309,7 @@ export function PublicBooking() {
 
         <section className="hero">
           <div className="hero-copy">
-            <span className="price-pill">Sesión Integral $399</span>
+            <span className="price-pill">Sesión Integral ${displayedOffer.price}</span>
             <h2>Agenda tu Sesión<br />en Más Sano</h2>
             <p className="lead">Ten una sesión con nutrióloga certificada y comienza con un plan adaptado a tu estilo de vida.</p>
             <div className="hero-actions">
@@ -328,7 +332,7 @@ export function PublicBooking() {
             )}
 
             <section className="info-block includes-block">
-              <h3>Qué incluye tu sesión de $399</h3>
+              <h3>Qué incluye tu sesión de ${displayedOffer.price}</h3>
               <div className="info-grid">
                 {sessionIncludes.map((item) => (
                   <div className="mini-card" key={item}>
