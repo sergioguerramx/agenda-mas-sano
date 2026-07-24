@@ -116,7 +116,7 @@ Para conectar Supabase:
 - Pacientes separados de sus citas, permitiendo familiares con el mismo WhatsApp.
 - Historial compacto con sucursal, fecha, confirmacion, asistencia y cita liberada a las 8:00.
 - Segmentos calculados al consultar, sin guardar copias innecesarias.
-- Calendarios separados para San Nicolas y Monterrey Sur.
+- Calendarios separados para San Nicolás y Monterrey Poniente.
 - Registro minimo de campañas y exclusiones, sin guardar notas clinicas.
 - Reflejo automatico de las citas nuevas que ya genera la pagina.
 - Consentimiento promocional activo por la autorizacion fisica general; una exclusion expresa siempre tiene prioridad.

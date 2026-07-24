@@ -27,10 +27,24 @@ const emptyDraft: AppointmentDraft = {
   branchCode: undefined
 };
 
-const branchOptions: Array<{ code: ActiveBranchCode; openingNote?: string }> = [
+const allBranchOptions: Array<{ code: ActiveBranchCode; openingNote?: string }> = [
   { code: "SN", openingNote: "Cambio de ubicación · Anáhuac desde el 3 de agosto" },
   { code: "MTY_SUR", openingNote: "Nueva sucursal · Apertura 3 de agosto" }
 ];
+
+const MONTERREY_PONIENTE_VISIBLE_AT = 0;
+
+function isMonterreyPonienteVisible(now = new Date()) {
+  return now.getTime() >= MONTERREY_PONIENTE_VISIBLE_AT;
+}
+
+function getBookingDatesStart(branchCode?: ActiveBranchCode) {
+  const now = new Date();
+  if (branchCode === "MTY_SUR" && !isMonterreyPonienteVisible(now)) {
+    return new Date("2026-07-24T13:00:00-06:00");
+  }
+  return now;
+}
 
 const adOriginOptions = [
   { value: "sin_identificar", label: "Sin identificar" },
@@ -72,7 +86,7 @@ const faqs = [
   },
   {
     question: "¿Dónde es la atención?",
-    answer: "Puedes elegir entre San Nicolás y Monterrey Sur al iniciar tu reservación."
+    answer: "Puedes elegir entre San Nicolás y Monterrey Poniente al iniciar tu reservación."
   },
   {
     question: "¿Qué pasa si necesito cambiar mi cita?",
@@ -81,6 +95,15 @@ const faqs = [
 ];
 
 export function PublicBooking() {
+  const [monterreyPonienteVisible, setMonterreyPonienteVisible] = useState(isMonterreyPonienteVisible);
+  const branchOptions = monterreyPonienteVisible
+    ? allBranchOptions
+    : allBranchOptions.filter((branch) => branch.code === "SN");
+  const visibleFaqs = faqs.map((faq) => (
+    faq.question === "¿Dónde es la atención?" && !monterreyPonienteVisible
+      ? { ...faq, answer: "Por el momento, la agenda pública muestra únicamente la sucursal San Nicolás." }
+      : faq
+  ));
   const [step, setStep] = useState<Step>("branch");
   const [draft, setDraft] = useState<AppointmentDraft>(emptyDraft);
   const [reservedSlots, setReservedSlots] = useState<ReservedSlots>({});
@@ -90,7 +113,7 @@ export function PublicBooking() {
   const [logoReady, setLogoReady] = useState(true);
   const dates = useMemo(() => {
     const openingDate = draft.branchCode ? BRANCH_OPENING_DATES[draft.branchCode] : null;
-    return buildAvailableDates(new Date()).map((date) => ({
+    return buildAvailableDates(getBookingDatesStart(draft.branchCode)).map((date) => ({
       ...date,
       closed: date.closed || Boolean(openingDate && date.iso < openingDate)
     }));
@@ -107,13 +130,29 @@ export function PublicBooking() {
   const selectedSlot = slots.find((slot) => slot.time === draft.time);
 
   useEffect(() => {
+    if (monterreyPonienteVisible) return;
+
+    const remaining = MONTERREY_PONIENTE_VISIBLE_AT - Date.now();
+    const timer = window.setTimeout(
+      () => setMonterreyPonienteVisible(true),
+      Math.max(0, remaining) + 250
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [monterreyPonienteVisible]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fullName = params.get("name")?.trim().replace(/\s+/g, " ") ?? "";
     const nameParts = fullName ? fullName.split(" ") : [];
     const whatsapp = params.get("whatsapp")?.trim() ?? "";
     const adOrigin = params.get("adOrigin")?.trim() ?? "";
     const branchParam = params.get("branch")?.trim().toUpperCase() ?? "";
-    const branchCode = branchParam === "SN" || branchParam === "MTY_SUR" ? branchParam : undefined;
+    const branchCode = branchParam === "SN"
+      ? "SN"
+      : branchParam === "MTY_SUR" && isMonterreyPonienteVisible()
+        ? "MTY_SUR"
+        : undefined;
 
     if (!fullName && !whatsapp && !adOrigin && !branchCode) return;
 
@@ -282,7 +321,9 @@ export function PublicBooking() {
             ) : (
               <div className="location-chip">
                 <MapPin size={18} />
-                <span><strong>Dos sucursales disponibles</strong><small>San Nicolás y Monterrey Sur</small></span>
+                {monterreyPonienteVisible
+                  ? <span><strong>Dos sucursales disponibles</strong><small>San Nicolás y Monterrey Poniente</small></span>
+                  : <span><strong>Sucursal disponible</strong><small>San Nicolás</small></span>}
               </div>
             )}
 
@@ -460,7 +501,7 @@ export function PublicBooking() {
             <h2>Preguntas frecuentes</h2>
           </div>
           <div className="faq-list">
-            {faqs.map((faq) => (
+            {visibleFaqs.map((faq) => (
               <details className="faq-item" key={faq.question}>
                 <summary>{faq.question}</summary>
                 <p>{faq.answer}</p>

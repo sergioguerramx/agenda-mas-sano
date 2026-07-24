@@ -18,7 +18,7 @@ values
   ('SN', 'San Nicolás', 'ms.suc.puentes@gmail.com', true),
   ('GPE_CENTRO', 'Guadalupe Centro', null, false),
   ('GPE_LINDAVISTA', 'Guadalupe Lindavista', null, false),
-  ('MTY_SUR', 'Monterrey Sur', 'ms.suc.mty@gmail.com', true),
+  ('MTY_SUR', 'Monterrey Poniente', 'ms.suc.mty@gmail.com', true),
   ('ESCOBEDO', 'Escobedo', 'ms.suc.escobedo@gmail.com', false)
 on conflict (code) do update set
   name = excluded.name,

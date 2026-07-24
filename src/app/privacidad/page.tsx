@@ -29,7 +29,7 @@ export default function PrivacyPage() {
 
           <h2>Responsable</h2>
           <p className="copy">
-            Mas Sano Nutricion Holistica, con atencion presencial en San Nicolas de los Garza y Monterrey Sur,
+            Mas Sano Nutricion Holistica, con atencion presencial en San Nicolas de los Garza y Monterrey Poniente,
             Nuevo Leon, Mexico.
           </p>
 

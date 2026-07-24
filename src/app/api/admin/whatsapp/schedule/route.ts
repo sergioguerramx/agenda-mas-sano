@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedMessagingEmail } from "@/lib/admin-auth";
 import { BRANCH_SHORT_NAMES, getBranchLocation } from "@/lib/branch-locations";
+import { getMasSanoAppointmentOffer } from "@/lib/mas-sano-pricing";
 import { buildSlotsForDate, formatDisplayDate } from "@/lib/schedule";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { syncContactFromAppointment } from "@/services/contacts";
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Completa sucursal, fecha y horario." }, { status: 400 });
   }
   if (branchCode === "MTY_SUR" && date < MTY_SUR_OPENING_DATE) {
-    return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
+    return NextResponse.json({ error: "Monterrey Poniente abre agenda a partir del 3 de agosto." }, { status: 409 });
   }
 
   const requestedSlot = buildSlotsForDate(date, new Date(), {}, branchCode as "SN" | "MTY_SUR").find((slot) => slot.time === time);
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
         status: initialStatus,
         brand: "mas_sano",
         modality: "presencial",
-        service: "sesion_integral_399",
+        service: getMasSanoAppointmentOffer(date).service,
         origin: "whatsapp_directo",
         branch_code: branchCode
       })
@@ -200,6 +201,7 @@ export async function POST(request: NextRequest) {
     await client.from("whatsapp_conversations").update({
       workflow_status: "cita_agendada",
       branch_interest: branchCode,
+      follow_up_at: null,
       updated_by_email: operatorEmail,
       updated_at: updatedAt
     }).eq("id", conversationId);

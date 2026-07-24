@@ -90,7 +90,7 @@ El panel muestra:
 - Respuestas rápidas.
 - Estado de entrega y lectura.
 - Nombre del responsable que contestó.
-- Agendado directo en San Nicolás o Monterrey Sur.
+- Agendado directo en San Nicolás o Monterrey Poniente.
 - En el panel administrativo, coincidencias con pacientes e historial resumido.
 
 Los estados de conversación son: nuevo, interesado, cita agendada, dar seguimiento, no interesado, atención cerrada y no contactar.
@@ -107,7 +107,7 @@ Actualmente tienen acceso operativo:
 - `ms.suc.puentes@gmail.com`
 - `ms.suc.mty@gmail.com`
 
-La administración puede agregar o retirar correos desde la página de accesos. Cada mensaje enviado conserva el responsable: Administrador, San Nicolás, Monterrey Sur o Automatización.
+La administración puede agregar o retirar correos desde la página de accesos. Cada mensaje enviado conserva el responsable: Administrador, San Nicolás, Monterrey Poniente o Automatización.
 
 Para INCAIN debe crearse una lista independiente de correos autorizados y una cuenta administradora propia.
 

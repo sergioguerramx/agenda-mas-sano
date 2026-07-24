@@ -3,7 +3,7 @@ export type Slot = { time: string; label: string; available: boolean; remaining:
 export type ReservedSlots = Record<string, number>;
 export type ScheduleBranchCode = "SN" | "MTY_SUR";
 
-const MAX_DAYS_AHEAD = 21;
+const MAX_DAYS_AHEAD = 15;
 const MIN_ADVANCE_MINUTES = 30;
 const DEFAULT_APPOINTMENTS_PER_SLOT = 2;
 const SATURDAY_EXTRA_APPOINTMENTS_PER_SLOT = 3;

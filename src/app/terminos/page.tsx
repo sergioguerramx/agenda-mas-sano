@@ -29,7 +29,7 @@ export default function TermsPage() {
           <h2>Servicio</h2>
           <p className="copy">
             Mas Sano Nutricion Holistica ofrece sesiones presenciales de orientacion y acompanamiento en San Nicolas de
-            los Garza y Monterrey Sur, Nuevo Leon. La informacion del sitio tiene fines informativos y comerciales.
+            los Garza y Monterrey Poniente, Nuevo Leon. La informacion del sitio tiene fines informativos y comerciales.
           </p>
 
           <h2>Agenda y disponibilidad</h2>

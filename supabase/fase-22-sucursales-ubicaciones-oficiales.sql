@@ -18,12 +18,12 @@ update public.branches
 set
   name = case code
     when 'SN' then 'Más Sano Nutrición Holística - Suc. San Nicolás'
-    when 'MTY_SUR' then 'Más Sano Nutrición Holística - Suc. Monterrey Sur'
+    when 'MTY_SUR' then 'Más Sano Nutrición Holística - Suc. Monterrey Poniente'
     else name
   end,
   public_name = case code
     when 'SN' then 'Más Sano Nutrición Holística - Suc. San Nicolás'
-    when 'MTY_SUR' then 'Más Sano Nutrición Holística - Suc. Monterrey Sur'
+    when 'MTY_SUR' then 'Más Sano Nutrición Holística - Suc. Monterrey Poniente'
     else public_name
   end,
   whatsapp = '+528186935634',
@@ -70,8 +70,8 @@ on conflict (branch_id, valid_from) do update set
   valid_until = excluded.valid_until, updated_at = now();
 
 insert into public.branch_locations (branch_id, label, address, maps_url, valid_from, valid_until)
-select id, 'Distrito Tec', 'Dentro de Equilibriovivo, Alejandría 120, Roma, Distrito Tec, 64700 Monterrey, N.L.',
-  'https://maps.app.goo.gl/gVdFZaETS4RWCbyNA', date '2026-08-03', null
+select id, 'Plaza Real · ALFAO Business Center', 'Plaza Real, Av. Dr. José Eleuterio González 315, SUB-4, Jardines del Cerro, Monterrey, N.L., C.P. 64050. Segundo piso, dentro de ALFAO Business Center.',
+  'https://maps.app.goo.gl/HE2SPPVTPo27Zh2U6', date '2026-08-03', null
 from public.branches where code = 'MTY_SUR'
 on conflict (branch_id, valid_from) do update set
   label = excluded.label, address = excluded.address, maps_url = excluded.maps_url,
@@ -96,4 +96,3 @@ grant usage, select on sequence public.branch_locations_id_seq to service_role;
 revoke all on public.branch_locations from anon;
 
 select pg_notify('pgrst', 'reload schema');
-

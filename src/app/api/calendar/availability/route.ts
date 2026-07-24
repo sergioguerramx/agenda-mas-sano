@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
   const openingDate = BRANCH_OPENING_DATES[branchCode];
   if (openingDate && date < openingDate) {
-    return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
+    return NextResponse.json({ error: "Monterrey Poniente abre agenda a partir del 3 de agosto." }, { status: 409 });
   }
 
   try {

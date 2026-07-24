@@ -16,12 +16,12 @@ export const MAS_SANO_COMMON_CONTACT = {
 
 export const BRANCH_PUBLIC_NAMES: Record<ActiveBranchCode, string> = {
   SN: "Más Sano Nutrición Holística - Suc. San Nicolás",
-  MTY_SUR: "Más Sano Nutrición Holística - Suc. Monterrey Sur"
+  MTY_SUR: "Más Sano Nutrición Holística - Suc. Monterrey Poniente"
 };
 
 export const BRANCH_SHORT_NAMES: Record<ActiveBranchCode, string> = {
   SN: "San Nicolás",
-  MTY_SUR: "Monterrey Sur"
+  MTY_SUR: "Monterrey Poniente"
 };
 
 export const BRANCH_OPENING_DATES: Record<ActiveBranchCode, string | null> = {
@@ -45,9 +45,9 @@ const LOCATIONS: Record<ActiveBranchCode, BranchLocation[]> = {
     }
   ],
   MTY_SUR: [{
-    label: "Distrito Tec",
-    address: "Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec. Referencia: atrás del Teatro Nena Delgado.",
-    mapsUrl: "https://maps.app.goo.gl/gVdFZaETS4RWCbyNA"
+    label: "Plaza Real · ALFAO Business Center",
+    address: "Plaza Real, Av. Dr. José Eleuterio González 315, SUB-4, Jardines del Cerro, Monterrey, N.L., C.P. 64050. Segundo piso, dentro de ALFAO Business Center.",
+    mapsUrl: "https://maps.app.goo.gl/HE2SPPVTPo27Zh2U6"
   }]
 };
 

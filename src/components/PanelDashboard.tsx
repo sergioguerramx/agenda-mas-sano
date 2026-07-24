@@ -182,6 +182,7 @@ function getAppointmentTypeLabel(item: Appointment) {
 function getServiceLabel(item: Appointment) {
   if (item.service === "paquete_1199") return "Paquete 4 sesiones";
   if (item.service === "sesion_online_399") return "Sesión Online $399";
+  if (item.service === "sesion_integral_449") return "Sesión Integral $449";
   return "Sesión Integral $399";
 }
 
@@ -538,7 +539,7 @@ export function PanelDashboard() {
                         <select id="branchFilter" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value as "" | ActiveBranchCode)}>
                           <option value="">Todas las sucursales</option>
                           <option value="SN">San Nicolás</option>
-                          <option value="MTY_SUR">Monterrey Sur</option>
+                          <option value="MTY_SUR">Monterrey Poniente</option>
                         </select>
                       </div>
                     </div>
@@ -613,7 +614,7 @@ export function PanelDashboard() {
               <div className="filters">
                 <div className="field"><label htmlFor="contactSearch">Buscar</label><input id="contactSearch" type="search" placeholder="Nombre, apellido o WhatsApp" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} /></div>
                 <div className="field"><label htmlFor="contactDateFilter">Fecha</label><input id="contactDateFilter" type="date" value={contactDate} onChange={(event) => setContactDate(event.target.value)} /></div>
-                <div className="field"><label htmlFor="contactBranchFilter">Sucursal</label><select id="contactBranchFilter" value={contactBranchFilter} onChange={(event) => setContactBranchFilter(event.target.value as "" | ActiveBranchCode)}><option value="">Todas las sucursales</option><option value="SN">San Nicolás</option><option value="MTY_SUR">Monterrey Sur</option></select></div>
+                <div className="field"><label htmlFor="contactBranchFilter">Sucursal</label><select id="contactBranchFilter" value={contactBranchFilter} onChange={(event) => setContactBranchFilter(event.target.value as "" | ActiveBranchCode)}><option value="">Todas las sucursales</option><option value="SN">San Nicolás</option><option value="MTY_SUR">Monterrey Poniente</option></select></div>
               </div>
               <div className="actions"><button className="secondary" onClick={exportContacts} type="button"><Download size={17} />Exportar CSV</button></div>
               <div className="list">

@@ -1,4 +1,4 @@
--- Habilita la agenda pública de Monterrey Sur con capacidad independiente.
+-- Habilita la agenda pública de Monterrey Poniente con capacidad independiente.
 
 create or replace function public.slot_capacity_for_branch(
   p_appointment_date date,
@@ -93,7 +93,7 @@ begin
     raise exception using message = 'Elige una sucursal válida.';
   end if;
   if normalized_branch = 'MTY_SUR' and p_appointment_date < date '2026-08-03' then
-    raise exception using message = 'Monterrey Sur abre agenda a partir del 3 de agosto.';
+    raise exception using message = 'Monterrey Poniente abre agenda a partir del 3 de agosto.';
   end if;
   if not exists (
     select 1 from public.branches

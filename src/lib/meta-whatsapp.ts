@@ -57,9 +57,9 @@ async function sendCloudWhatsAppPayload(payload: Record<string, unknown>) {
 
 export function getAppointmentTemplateNames() {
   return {
-    first: (process.env.META_WHATSAPP_CONFIRMATION_TEMPLATE ?? "mas_sano_confirmacion_cita").trim(),
-    second: (process.env.META_WHATSAPP_SECOND_CONFIRMATION_TEMPLATE ?? "mas_sano_segunda_confirmacion").trim(),
-    released: (process.env.META_WHATSAPP_RELEASED_TEMPLATE ?? "mas_sano_cita_liberada").trim(),
+    first: (process.env.META_WHATSAPP_CONFIRMATION_TEMPLATE ?? "mas_sano_confirmacion_cita_v2").trim(),
+    second: (process.env.META_WHATSAPP_SECOND_CONFIRMATION_TEMPLATE ?? "mas_sano_segunda_confirmacion_v2").trim(),
+    released: (process.env.META_WHATSAPP_RELEASED_TEMPLATE ?? "mas_sano_cita_liberada_v2").trim(),
     language: (process.env.META_WHATSAPP_TEMPLATE_LANGUAGE ?? "es").trim()
   };
 }
@@ -132,10 +132,10 @@ export async function sendCloudWhatsAppTemplate(
   language: string,
   parameters: string[]
 ) {
-  const components: WhatsAppTemplateComponent[] = [{
+  const components: WhatsAppTemplateComponent[] = parameters.length > 0 ? [{
     type: "body",
     parameters: parameters.map((text) => ({ type: "text", text }))
-  }];
+  }] : [];
 
   return sendCloudWhatsAppPayload({
     messaging_product: "whatsapp",
@@ -145,7 +145,7 @@ export async function sendCloudWhatsAppTemplate(
     template: {
       name: templateName,
       language: { code: language },
-      components
+      ...(components.length > 0 ? { components } : {})
     }
   });
 }
@@ -202,10 +202,12 @@ export function getIncomingMessageBody(message: Record<string, unknown>) {
 }
 
 export function getIncomingMessageSelectionId(message: Record<string, unknown>) {
+  const button = message.button as { payload?: string } | undefined;
   const interactive = message.interactive as
     | { button_reply?: { id?: string }; list_reply?: { id?: string } }
     | undefined;
 
+  if (message.type === "button") return button?.payload?.trim() || "";
   if (message.type !== "interactive") return "";
   return interactive?.button_reply?.id?.trim()
     || interactive?.list_reply?.id?.trim()

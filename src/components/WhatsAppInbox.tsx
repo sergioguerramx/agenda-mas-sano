@@ -35,7 +35,7 @@ const WORKFLOW_OPTIONS = [
 const BRANCH_OPTIONS = [
   { value: "", label: "Sucursal por confirmar" },
   { value: "SN", label: "San Nicolás" },
-  { value: "MTY_SUR", label: "Monterrey Sur" }
+  { value: "MTY_SUR", label: "Monterrey Poniente" }
 ] as const;
 
 const QUICK_REPLIES = [
@@ -62,7 +62,7 @@ const QUICK_REPLIES = [
     label: "Ubicación Sur",
     text: () => {
       const location = getBranchLocation("MTY_SUR");
-      return `Más Sano Monterrey Sur está en ${location.address}\n${location.mapsUrl}`;
+      return `Más Sano Monterrey Poniente está en ${location.address}\n${location.mapsUrl}`;
     }
   },
   {
@@ -100,6 +100,7 @@ type InboxMessage = {
   delivered_at: string | null;
   read_at: string | null;
   sent_by_email: string | null;
+  error_message: string | null;
 };
 
 type PatientMatch = {
@@ -199,8 +200,10 @@ function deliveryLabel(message: InboxMessage) {
 function responderLabel(email: string) {
   const normalized = email.trim().toLowerCase();
   if (normalized === "ms.suc.puentes@gmail.com") return "San Nicolás";
-  if (normalized === "ms.suc.mty@gmail.com") return "Monterrey Sur";
+  if (normalized === "ms.suc.mty@gmail.com") return "Monterrey Poniente";
   if (normalized === "automatizacion") return "Automatización";
+  if (normalized === "prueba_confirmacion") return "Prueba segura";
+  if (normalized === "prueba_retargeting") return "Prueba de reactivación";
   if (isAllowedAdminEmail(normalized)) return "Administrador";
   return normalized;
 }
@@ -314,7 +317,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     if (teamMode) {
       const { data: messageData } = await supabase
         .from("whatsapp_messages")
-        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email")
+        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email, error_message")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: true });
       setMessages((messageData ?? []) as InboxMessage[]);
@@ -328,7 +331,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     const [{ data: messageData }, { data: patientData }, { data: branchData }] = await Promise.all([
       supabase
         .from("whatsapp_messages")
-        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email")
+        .select("id, meta_message_id, direction, message_type, body, delivery_status, sent_at, delivered_at, read_at, sent_by_email, error_message")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: true }),
       supabase
@@ -516,7 +519,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
     return response;
   }
 
-  async function sendConfirmationTest() {
+  async function sendConfirmationTest(stage: "first" | "second" | "released") {
     if (!selected || testingConfirmation) return;
     setTestingConfirmation(true);
     setNotice("");
@@ -524,14 +527,140 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
       const response = await fetchAsAdmin("/api/admin/whatsapp/test-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: selected.id })
+        body: JSON.stringify({ conversationId: selected.id, stage })
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "No se pudo enviar la prueba.");
-      setNotice("Confirmación de prueba enviada a INCAIN.");
+      const labels = {
+        first: "primer aviso",
+        second: "segundo aviso",
+        released: "liberación"
+      } as const;
+      setNotice(`Prueba de ${labels[stage]} enviada a INCAIN. No se creó ninguna cita ni se modificó Calendar.`);
       if (client) await loadConversation(client, selected);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "No se pudo enviar la prueba.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
+  async function sendRetargetingTest() {
+    if (!selected || testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/test-retargeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: selected.id, branchCode: "MTY_SUR" })
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo enviar la prueba.");
+      setNotice("Plantilla de reactivación de Monterrey Poniente enviada al número de prueba.");
+      if (client) await loadConversation(client, selected);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo enviar la prueba.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
+  async function sendAdSequenceTest(stage: 0 | 1 | 2 | 3) {
+    if (!selected || testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/test-ad-sequence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: selected.id, stage })
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo enviar la prueba.");
+      const labels = ["mensaje inicial", "seguimiento del mismo día", "seguimiento del día siguiente", "mensaje final"];
+      setNotice(`Prueba enviada: ${labels[stage]}.`);
+      if (client) await loadConversation(client, selected);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo enviar la prueba.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
+  async function startMonterreySurPilot() {
+    if (testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/retargeting-pilot", { method: "POST" });
+      const data = await response.json() as {
+        error?: string;
+        alreadyStarted?: boolean;
+        selected?: number;
+        sent?: number;
+        failed?: number;
+        averageAppointments?: number;
+      };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo iniciar el piloto.");
+      const prefix = data.alreadyStarted ? "El piloto ya estaba iniciado." : "Piloto iniciado.";
+      setNotice(`${prefix} Enviados: ${data.sent ?? 0} de ${data.selected ?? 0}. Fallidos: ${data.failed ?? 0}.`);
+      if (client) await loadConversations(client);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo iniciar el piloto.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
+  async function previewTestHistory() {
+    if (testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/cleanup-test-history");
+      const data = await response.json() as {
+        error?: string;
+        conversation?: number;
+        messages?: number;
+        appointments?: Array<unknown>;
+        contacts?: number;
+        patientProfiles?: number;
+      };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo revisar el historial de prueba.");
+      setNotice(`Pruebas encontradas: ${data.messages ?? 0} mensajes, ${data.appointments?.length ?? 0} citas, ${data.contacts ?? 0} contactos y ${data.patientProfiles ?? 0} fichas.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo revisar el historial de prueba.");
+    } finally {
+      setTestingConfirmation(false);
+    }
+  }
+
+  async function deleteTestHistory() {
+    if (testingConfirmation) return;
+    setTestingConfirmation(true);
+    setNotice("");
+    try {
+      const response = await fetchAsAdmin("/api/admin/whatsapp/cleanup-test-history", { method: "DELETE" });
+      const data = await response.json() as {
+        error?: string;
+        detail?: string;
+        removed?: {
+          messages?: number;
+          appointments?: number;
+          calendarEvents?: number;
+          contacts?: number;
+          patientProfiles?: number;
+        };
+      };
+      if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join(" ") || "No se pudo borrar el historial de prueba.");
+      const removed = data.removed;
+      setNotice(`Historial de prueba eliminado: ${removed?.messages ?? 0} mensajes, ${removed?.appointments ?? 0} citas y ${removed?.calendarEvents ?? 0} espacios de Calendar.`);
+      setSelectedId("");
+      setMessages([]);
+      if (client) await loadConversations(client);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo borrar el historial de prueba.");
     } finally {
       setTestingConfirmation(false);
     }
@@ -675,7 +804,23 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
 
                 <div className="chat-action-bar">
                   <button className={`secondary mini-action ${showScheduler ? "active" : ""}`} onClick={openScheduler} type="button"><CalendarPlus size={16} />Agendar cita</button>
-                  {selected.whatsapp === "+528132469930" && <button className="secondary mini-action" disabled={testingConfirmation} onClick={sendConfirmationTest} type="button"><Send size={16} />{testingConfirmation ? "Enviando prueba" : "Probar confirmación ahora"}</button>}
+                  {selected.whatsapp === "+528132469930" && <>
+                    <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendConfirmationTest("first")} type="button"><Send size={16} />{testingConfirmation ? "Enviando prueba" : "Probar primer aviso"}</button>
+                    <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendConfirmationTest("second")} type="button"><Send size={16} />Probar segundo aviso</button>
+                    <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendConfirmationTest("released")} type="button"><Send size={16} />Probar liberación</button>
+                  </>}
+                  {selected.whatsapp === "+528114740974" && <>
+                    {!teamMode && <>
+                      <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendAdSequenceTest(0)} type="button"><Send size={16} />Probar mensaje inicial</button>
+                      <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendAdSequenceTest(1)} type="button"><Send size={16} />Probar seguimiento 1</button>
+                      <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendAdSequenceTest(2)} type="button"><Send size={16} />Probar seguimiento 2</button>
+                      <button className="secondary mini-action" disabled={testingConfirmation} onClick={() => sendAdSequenceTest(3)} type="button"><Send size={16} />Probar mensaje final</button>
+                    </>}
+                    <button className="secondary mini-action" disabled={testingConfirmation} onClick={sendRetargetingTest} type="button"><Send size={16} />{testingConfirmation ? "Procesando" : "Probar reactivación Mty Poniente"}</button>
+                    {!teamMode && <button className="secondary mini-action" disabled={testingConfirmation} onClick={startMonterreySurPilot} type="button"><Send size={16} />{testingConfirmation ? "Enviando piloto" : "Enviar piloto Mty Poniente · 25"}</button>}
+                    {!teamMode && <button className="secondary mini-action" disabled={testingConfirmation} onClick={previewTestHistory} type="button">Revisar pruebas</button>}
+                    {!teamMode && <button className="secondary mini-action" disabled={testingConfirmation} onClick={deleteTestHistory} type="button">Borrar pruebas</button>}
+                  </>}
                   {!teamMode && <button className={`secondary mini-action ${showDetails ? "active" : ""}`} onClick={() => { setShowScheduler(false); setShowDetails((value) => !value); }} type="button"><UserRound size={16} />Ficha y seguimiento</button>}
                   {!teamMode && <a className="secondary mini-action" href={buildBookingUrl(selected, activePatient)} target="_blank" rel="noreferrer">Abrir agenda pública</a>}
                 </div>
@@ -699,7 +844,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
                           if (nextDate) void loadScheduleAvailability(branch, nextDate);
                         }}>
                           <option value="SN">San Nicolás</option>
-                          <option value="MTY_SUR">Monterrey Sur</option>
+                          <option value="MTY_SUR">Monterrey Poniente</option>
                         </select>
                       </label>
                       <label>Fecha
@@ -750,7 +895,7 @@ export function WhatsAppInbox({ mode = "admin" }: { mode?: "admin" | "team" }) {
                 )}
 
                 <div className="message-list" ref={messageListRef}>
-                  {messages.map((message) => <div className={`message-bubble ${message.direction === 2 ? "outbound" : "inbound"}`} key={message.id}><p>{message.body || "Mensaje sin texto"}</p><small>{formatDateTime(message.sent_at)} {deliveryLabel(message)}</small>{message.direction === 2 && message.sent_by_email && <small>Respondió: {responderLabel(message.sent_by_email)}</small>}</div>)}
+                  {messages.map((message) => <div className={`message-bubble ${message.direction === 2 ? "outbound" : "inbound"}`} key={message.id}><p>{message.body || "Mensaje sin texto"}</p><small>{formatDateTime(message.sent_at)} {deliveryLabel(message)}</small>{message.delivery_status === -1 && message.error_message && <small>Motivo: {message.error_message}</small>}{message.direction === 2 && message.sent_by_email && <small>Respondió: {responderLabel(message.sent_by_email)}</small>}</div>)}
                   {messages.length === 0 && <p className="copy empty-inbox">Todavía no hay mensajes guardados.</p>}
                 </div>
 

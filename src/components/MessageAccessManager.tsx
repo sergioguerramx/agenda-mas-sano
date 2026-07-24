@@ -163,7 +163,7 @@ export function MessageAccessManager() {
           <div className="access-list">
             {users.map((user) => (
               <article key={user.email}>
-                <div><strong>{user.email}</strong><span>Mensajes y agendas de San Nicolás y Monterrey Sur</span></div>
+                <div><strong>{user.email}</strong><span>Mensajes y agendas de San Nicolás y Monterrey Poniente</span></div>
                 {confirmRemove === user.email ? (
                   <div className="access-confirm"><button className="secondary" onClick={() => setConfirmRemove("")} type="button">Cancelar</button><button className="danger-button" disabled={saving} onClick={() => removeUser(user.email)} type="button">Confirmar retiro</button></div>
                 ) : <button className="icon-button" aria-label={`Retirar acceso de ${user.email}`} onClick={() => setConfirmRemove(user.email)} type="button"><Trash2 size={17} /></button>}

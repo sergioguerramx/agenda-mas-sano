@@ -3,19 +3,44 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Más Sano Nutrición Holística | San Nicolás y Monterrey Sur</title>
+    <title>Más Sano Nutrición Holística | San Nicolás y Monterrey Poniente</title>
     <meta
       name="description"
-      content="Agenda tu sesión integral con nutrióloga en San Nicolás o Monterrey Sur. Plan personalizado, auriculoterapia metabólica y acompañamiento humano. Promoción $399 MXN."
+      content="Agenda tu sesión integral con nutrióloga en San Nicolás o Monterrey Poniente. Plan personalizado, auriculoterapia metabólica y acompañamiento humano. Promoción $399 MXN."
     />
     <meta name="theme-color" content="#29483a" />
     <meta property="og:title" content="Más Sano Nutrición Holística" />
     <meta
       property="og:description"
-      content="Sesión integral con nutrióloga en San Nicolás o Monterrey Sur por $399 MXN. Plan personalizado, auriculoterapia metabólica y acompañamiento humano."
+      content="Sesión integral con nutrióloga en San Nicolás o Monterrey Poniente por $399 MXN. Plan personalizado, auriculoterapia metabólica y acompañamiento humano."
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://massanonh.com/assets/valeria-profesional.png" />
+    <style>
+      [data-mty-visible] { display: none !important; }
+      html.mty-public-visible [data-mty-visible] { display: revert !important; }
+      html.mty-public-visible [data-mty-hidden] { display: none !important; }
+    </style>
+    <script>
+      (() => {
+        const visibleAt = 0;
+        const applyVisibility = () => {
+          const visible = Date.now() >= visibleAt;
+          document.documentElement.classList.toggle("mty-public-visible", visible);
+          document.title = visible
+            ? "Más Sano Nutrición Holística | San Nicolás y Monterrey Poniente"
+            : "Más Sano Nutrición Holística | San Nicolás";
+          const description = visible
+            ? "Agenda tu sesión integral con nutrióloga en San Nicolás o Monterrey Poniente. Plan personalizado, auriculoterapia metabólica y acompañamiento humano. Promoción $399 MXN."
+            : "Agenda tu sesión integral con nutrióloga en San Nicolás. Plan personalizado, auriculoterapia metabólica y acompañamiento humano. Promoción $399 MXN.";
+          document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+          document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
+        };
+        applyVisibility();
+        const remaining = visibleAt - Date.now();
+        if (remaining > 0) window.setTimeout(applyVisibility, remaining + 250);
+      })();
+    </script>
     <link rel="preload" href="/assets/valeria-profesional.png" as="image" />
     <link rel="stylesheet" href="styles.css?v=20260721-1" />
     <link rel="stylesheet" href="overrides.css?v=20260721-1" />
@@ -61,8 +86,12 @@
           <div class="msnh-hero-copy msnh-reveal">
             <span class="msnh-kicker">Más Sano Nutrición Holística</span>
             <h1>Empieza a bajar tallas y construir tu nuevo estilo de vida con un plan hecho para ti.</h1>
-            <p>
-              Agenda tu sesión integral con nutrióloga en San Nicolás o Monterrey Sur. Incluye valoración personalizada, plan de
+            <p data-mty-visible>
+              Agenda tu sesión integral con nutrióloga en San Nicolás o Monterrey Poniente. Incluye valoración personalizada, plan de
+              alimentación, auriculoterapia metabólica y acompañamiento humano.
+            </p>
+            <p data-mty-hidden>
+              Agenda tu sesión integral con nutrióloga en San Nicolás. Incluye valoración personalizada, plan de
               alimentación, auriculoterapia metabólica y acompañamiento humano.
             </p>
 
@@ -274,7 +303,8 @@
               <a class="msnh-button msnh-button-primary" href="https://wa.me/528186935634?text=Hola%2C%20quiero%20informaci%C3%B3n%20para%20agendar%20una%20sesi%C3%B3n%20en%20M%C3%A1s%20Sano.">Quiero mi sesión de $399</a>
               <a class="msnh-button msnh-button-secondary" href="https://agenda.massanonh.com/">Agendar directo en línea</a>
             </div>
-            <small>Cupo sujeto a disponibilidad de agenda en San Nicolás y Monterrey Sur.</small>
+            <small data-mty-visible>Cupo sujeto a disponibilidad de agenda en San Nicolás y Monterrey Poniente.</small>
+            <small data-mty-hidden>Cupo sujeto a disponibilidad de agenda en San Nicolás.</small>
           </div>
         </div>
       </section>
@@ -339,8 +369,10 @@
         <div class="msnh-container">
           <div class="msnh-section-heading msnh-location-content msnh-reveal">
             <span class="msnh-kicker">Ubicaciones</span>
-            <h2>Elige la sucursal más cercana para ti.</h2>
-            <p>Atención presencial con la misma experiencia Más Sano en dos zonas de Monterrey.</p>
+            <h2 data-mty-visible>Elige la sucursal más cercana para ti.</h2>
+            <p data-mty-visible>Atención presencial con la misma experiencia Más Sano en dos zonas de Monterrey.</p>
+            <h2 data-mty-hidden>Te esperamos en San Nicolás.</h2>
+            <p data-mty-hidden>Atención presencial con la experiencia Más Sano de siempre.</p>
           </div>
           <div class="msnh-location-grid">
             <article class="msnh-location-card msnh-reveal">
@@ -364,14 +396,14 @@
                 <a class="msnh-button msnh-button-primary" href="https://agenda.massanonh.com/?branch=SN">Ver horarios</a>
               </div>
             </article>
-            <article class="msnh-location-card msnh-location-card-featured msnh-reveal">
+            <article class="msnh-location-card msnh-location-card-featured msnh-reveal" data-mty-visible>
               <span class="msnh-location-badge">Nueva sucursal</span>
-              <h3>Monterrey Sur · Distrito Tec</h3>
-              <p>Dentro de Equilibriovivo, Alejandría 120, Col. Roma, Distrito Tec.</p>
-              <small>Atrás del Teatro Nena Delgado. Apertura 3 de agosto.</small>
+              <h3>Monterrey Poniente · Plaza Real</h3>
+              <p>Av. Dr. José Eleuterio González 315, SUB-4, Jardines del Cerro. Segundo piso, dentro de ALFAO Business Center.</p>
+              <small>Segundo piso, dentro de ALFAO Business Center. Apertura 3 de agosto.</small>
               <div class="msnh-actions">
                 <a class="msnh-button msnh-button-primary" href="https://agenda.massanonh.com/?branch=MTY_SUR">Ver horarios</a>
-                <a class="msnh-button msnh-button-secondary" href="https://maps.app.goo.gl/gVdFZaETS4RWCbyNA">Ver mapa</a>
+                <a class="msnh-button msnh-button-secondary" href="https://maps.app.goo.gl/HE2SPPVTPo27Zh2U6">Ver mapa</a>
               </div>
             </article>
           </div>
@@ -387,7 +419,8 @@
           <div class="msnh-faq-list msnh-reveal">
             <details>
               <summary>¿La sesión es presencial?</summary>
-              <p>Sí, la sesión es presencial. Puedes elegir San Nicolás o Monterrey Sur al agendar.</p>
+              <p data-mty-visible>Sí, la sesión es presencial. Puedes elegir San Nicolás o Monterrey Poniente al agendar.</p>
+              <p data-mty-hidden>Sí, la sesión es presencial en nuestra sucursal San Nicolás.</p>
             </details>
             <details>
               <summary>¿Qué incluye la sesión integral?</summary>
@@ -411,7 +444,8 @@
             </details>
             <details>
               <summary>¿Dónde están ubicados?</summary>
-              <p>San Nicolás atiende en Las Puentes hasta el sábado 1 de agosto y cambia a Anáhuac desde el lunes 3. Monterrey Sur se encuentra dentro de Equilibriovivo en Distrito Tec.</p>
+              <p data-mty-visible>San Nicolás atiende en Las Puentes hasta el sábado 1 de agosto y cambia a Anáhuac desde el lunes 3. Monterrey Poniente abre el lunes 3 de agosto en Plaza Real, segundo piso, dentro de ALFAO Business Center.</p>
+              <p data-mty-hidden>San Nicolás atiende en Las Puentes hasta el sábado 1 de agosto y cambia a Anáhuac desde el lunes 3.</p>
             </details>
           </div>
         </div>
@@ -420,7 +454,8 @@
       <section class="msnh-final-cta">
         <div class="msnh-container msnh-final-cta-grid msnh-reveal">
           <div class="msnh-final-copy">
-            <span>San Nicolás y Monterrey Sur</span>
+            <span data-mty-visible>San Nicolás y Monterrey Poniente</span>
+            <span data-mty-hidden>San Nicolás</span>
             <h2>Empieza esta semana.</h2>
             <p>Plan personalizado, auriculoterapia y acompañamiento humano.</p>
           </div>
@@ -445,7 +480,8 @@
             <small>Nutrición Holística</small>
           </span>
         </a>
-        <address>Atención presencial en San Nicolás y Monterrey Sur, Nuevo León.</address>
+        <address data-mty-visible>Atención presencial en San Nicolás y Monterrey Poniente, Nuevo León.</address>
+        <address data-mty-hidden>Atención presencial en San Nicolás, Nuevo León.</address>
         <div class="msnh-footer-links">
           <a href="https://wa.me/528186935634?text=Hola%2C%20quiero%20informaci%C3%B3n%20para%20agendar%20una%20sesi%C3%B3n%20en%20M%C3%A1s%20Sano.">Agenda y nuevos pacientes: +52 81 8693 5634</a>
           <a href="https://wa.me/528123324511?text=Hola%2C%20soy%20paciente%20de%20M%C3%A1s%20Sano%20y%20necesito%20atenci%C3%B3n%20o%20seguimiento.">Atención y seguimiento a pacientes: +52 81 2332 4511</a>

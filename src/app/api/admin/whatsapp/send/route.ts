@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     last_message_at: sentAt,
     last_message_preview: body.slice(0, 180),
     last_message_direction: 2,
+    follow_up_at: null,
     updated_at: sentAt
   }).eq("id", conversation.id);
 

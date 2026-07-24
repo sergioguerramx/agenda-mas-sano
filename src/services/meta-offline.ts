@@ -22,9 +22,9 @@ type MetaPurchasePayload = {
     action_source: "physical_store";
     user_data: Record<string, string[]>;
     custom_data: {
-      value: 399;
+      value: 399 | 449;
       currency: "MXN";
-      content_name: "Sesión 399";
+      content_name: "Sesión 399" | "Sesión 449";
       content_category: "servicio_local";
       order_id: string;
       source: "agenda_mas_sano";
@@ -39,7 +39,6 @@ type MetaPurchaseOptions = {
 };
 
 const META_API_VERSION = "v20.0";
-const PURCHASE_VALUE = 399;
 const PURCHASE_CURRENCY = "MXN";
 
 function getMetaConfig() {
@@ -98,11 +97,12 @@ export function buildMasSanoMetaPurchasePayload(appointment: AppointmentRow, eve
   addUserData(userData, "em", normalizeEmail(appointment.correo));
   addUserData(userData, "fn", normalizeName(appointment.first_name));
   addUserData(userData, "ln", normalizeName(appointment.last_name));
+  const purchaseValue = appointment.service === "sesion_integral_449" ? 449 : 399;
 
   const customData: MetaPurchasePayload["data"][number]["custom_data"] = {
-    value: PURCHASE_VALUE,
+    value: purchaseValue,
     currency: PURCHASE_CURRENCY,
-    content_name: "Sesión 399",
+    content_name: purchaseValue === 449 ? "Sesión 449" : "Sesión 399",
     content_category: "servicio_local",
     order_id: appointmentId,
     source: "agenda_mas_sano"

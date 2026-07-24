@@ -14,10 +14,11 @@ const TIME_ZONE = "America/Monterrey";
 const AUTOMATION_START_DATE = "2026-08-03";
 const ACTIVE_BRANCHES = ["SN", "MTY_SUR"];
 const TEST_WHATSAPP = "+528132469930";
+const TEST_SENDER = "prueba_confirmacion";
 const CONFIRMATION_BUTTONS = [
-  { id: "confirmar_cita", title: "Sí, confirmo" },
-  { id: "reagendar_cita", title: "Quiero reagendar" },
-  { id: "cancelar_cita", title: "No podré asistir" }
+  { id: "confirmar_cita", title: "✅ Sí, confirmo" },
+  { id: "reagendar_cita", title: "🔄 Quiero reagendar" },
+  { id: "cancelar_cita", title: "🚫 No podré asistir" }
 ];
 const APPOINTMENT_SELECT = [
   "id", "first_name", "last_name", "whatsapp", "appointment_date", "appointment_time", "status",
@@ -147,14 +148,50 @@ async function saveOutboundMessage(appointment: AppointmentRow, metaMessageId: s
   if (messageError && messageError.code !== "23505") throw messageError;
 }
 
+async function saveTestOutboundMessage(
+  conversationId: string,
+  metaMessageId: string,
+  body: string,
+  sentAt: string,
+  messageType = "interactive"
+) {
+  const client = createSupabaseServiceRoleClient();
+  const { error: messageError } = await client.from("whatsapp_messages").insert({
+    conversation_id: conversationId,
+    meta_message_id: metaMessageId,
+    direction: 2,
+    message_type: messageType,
+    body,
+    delivery_status: 1,
+    sent_at: sentAt,
+    sent_by_email: TEST_SENDER
+  });
+  if (messageError && messageError.code !== "23505") throw messageError;
+
+  await client.from("whatsapp_conversations").update({
+    last_message_at: sentAt,
+    last_message_preview: body.slice(0, 180),
+    last_message_direction: 2,
+    updated_at: sentAt
+  }).eq("id", conversationId);
+}
+
 function confirmationCopy(appointment: AppointmentRow, branchName: string, stage: ConfirmationStage) {
   const name = appointment.first_name;
   const date = formatDate(appointment.appointment_date);
   const time = formatTime(appointment.appointment_time);
   if (stage === "second") {
-    return `Hola ${name}. Aún no recibimos confirmación para tu cita del ${date} a las ${time} en ${branchName}. Para conservar tu horario, selecciona una opción:`;
+    return [
+      `Hola, ${name} 💚 Aún no recibimos confirmación para tu cita.`,
+      `📅 ${date}\n🕐 ${time}\n📍 ${branchName}`,
+      "Si no recibimos respuesta, el horario podrá liberarse. Por favor selecciona una opción:"
+    ].join("\n\n");
   }
-  return `Hola ${name}. Te escribimos de Más Sano para confirmar tu cita del ${date} a las ${time} en ${branchName}. Para conservar tu horario, selecciona una opción:`;
+  return [
+    `Hola, ${name} 💚 Te escribimos de Más Sano para confirmar tu cita:`,
+    `📅 ${date}\n🕐 ${time}\n📍 ${branchName}`,
+    "Para conservar tu horario, selecciona una opción:"
+  ].join("\n\n");
 }
 
 async function claimAndSendConfirmation(
@@ -209,7 +246,10 @@ async function claimAndSendConfirmation(
 
 function releaseCopy(appointment: AppointmentRow) {
   const originalTime = appointment.confirmation_original_time ?? appointment.appointment_time;
-  return `Hola ${appointment.first_name}. Como no recibimos confirmación, liberamos el horario de tu cita de hoy a las ${formatTime(originalTime)}. Si deseas reagendar, con gusto te ayudamos. Quedamos a tus órdenes.`;
+  return [
+    `Hola, ${appointment.first_name}. Como no recibimos confirmación, liberamos el horario de tu cita de hoy a las ${formatTime(originalTime)}.`,
+    "Si deseas reagendar, con gusto te ayudamos. Quedamos a tus órdenes 💚"
+  ].join("\n\n");
 }
 
 async function sendReleaseNotice(appointment: AppointmentRow) {
@@ -359,7 +399,12 @@ export async function runAppointmentConfirmationCycle(now = new Date()) {
   return result;
 }
 
-export async function sendTestAppointmentConfirmation(conversationId: string) {
+export type TestConfirmationStage = "first" | "second" | "released";
+
+export async function sendTestAppointmentConfirmation(
+  conversationId: string,
+  stage: TestConfirmationStage = "first"
+) {
   if (!isCloudWhatsAppOutboundEnabled()) {
     throw new Error("Los mensajes de WhatsApp no están habilitados.");
   }
@@ -367,7 +412,7 @@ export async function sendTestAppointmentConfirmation(conversationId: string) {
   const client = createSupabaseServiceRoleClient();
   const { data: conversation } = await client
     .from("whatsapp_conversations")
-    .select("whatsapp")
+    .select("id, whatsapp")
     .eq("id", conversationId)
     .maybeSingle();
 
@@ -375,37 +420,51 @@ export async function sendTestAppointmentConfirmation(conversationId: string) {
     throw new Error("La prueba inmediata solo está permitida con el número de INCAIN.");
   }
 
-  const today = getMonterreyNow(new Date()).date;
-  const { data, error } = await client
-    .from("appointments")
-    .select(APPOINTMENT_SELECT)
-    .eq("whatsapp", TEST_WHATSAPP)
-    .ilike("first_name", "PRUEBA%")
-    .eq("status", "pending")
-    .gte("appointment_date", today)
-    .is("confirmation_response", null)
-    .is("confirmation_first_sent_at", null)
-    .order("appointment_date", { ascending: true })
-    .order("appointment_time", { ascending: true })
-    .limit(2);
-  if (error) throw error;
-  if (!data || data.length !== 1) {
-    throw new Error(data?.length ? "Hay más de una cita de prueba pendiente." : "No encontramos la cita de prueba pendiente.");
-  }
-
-  const appointment = data[0] as unknown as AppointmentRow;
-  const branches = await loadBranches();
-  const branch = appointment.branch_code ? branches.get(appointment.branch_code) : null;
-  if (!branch) throw new Error("No se encontró la sucursal de la cita de prueba.");
-
-  const status = await claimAndSendConfirmation(appointment, branch, "first", "buttons");
-  if (status !== "sent") throw new Error("La confirmación de prueba ya había sido enviada.");
+  const templates = getAppointmentTemplateNames();
+  const testName = "Prueba";
+  const testDate = "Martes 4 ago";
+  const testTime = "1:00 p.m.";
+  const testBranch = "Monterrey Poniente";
+  const body = stage === "first"
+    ? [
+      "PRUEBA INTERNA · No modifica la agenda",
+      `Hola, ${testName} 💚 Te escribimos de Más Sano para confirmar tu cita:`,
+      `📅 ${testDate}\n🕐 ${testTime}\n📍 ${testBranch}`,
+      "Para conservar tu horario, selecciona una opción:"
+    ].join("\n\n")
+    : stage === "second"
+      ? [
+        "PRUEBA INTERNA · No modifica la agenda",
+        `Hola, ${testName} 💚 Aún no recibimos confirmación para tu cita.`,
+        `📅 ${testDate}\n🕐 ${testTime}\n📍 ${testBranch}`,
+        "Si no recibimos respuesta, el horario podrá liberarse. Por favor selecciona una opción:"
+      ].join("\n\n")
+      : [
+        "PRUEBA INTERNA · No modifica la agenda",
+        `Hola, ${testName}. Como no recibimos confirmación, liberamos el horario de tu cita de hoy a las ${testTime}.`,
+        "Si deseas reagendar, con gusto te ayudamos. Quedamos a tus órdenes 💚"
+      ].join("\n\n");
+  const sentAt = new Date().toISOString();
+  const templateName = stage === "first"
+    ? templates.first
+    : stage === "second"
+      ? templates.second
+      : templates.released;
+  const parameters = stage === "released"
+    ? [testName, testTime]
+    : [testName, testDate, testTime, testBranch];
+  const metaMessageId = await sendCloudWhatsAppTemplate(
+    TEST_WHATSAPP,
+    templateName,
+    templates.language,
+    parameters
+  );
+  await saveTestOutboundMessage(conversation.id, metaMessageId, body, sentAt, "template");
 
   return {
-    appointmentId: appointment.id,
-    appointmentDate: appointment.appointment_date,
-    appointmentTime: appointment.appointment_time,
-    branchName: branch.name
+    conversationId: conversation.id,
+    safeMode: true,
+    stage
   };
 }
 
@@ -507,9 +566,21 @@ export async function handleAppointmentConfirmationReply(
   if (replyToMetaMessageId) {
     const { data: relatedMessage } = await client
       .from("whatsapp_messages")
-      .select("sent_at")
+      .select("conversation_id, sent_at, sent_by_email")
       .eq("meta_message_id", replyToMetaMessageId)
       .maybeSingle();
+
+    if (relatedMessage?.sent_by_email === TEST_SENDER && whatsapp === TEST_WHATSAPP) {
+      const body = intent === "confirm"
+        ? "✅ Prueba completada: reconocimos correctamente la confirmación. No se modificó ninguna cita ni agenda."
+        : intent === "reschedule"
+          ? "🔄 Prueba completada: reconocimos correctamente la solicitud para reagendar. No se modificó ninguna cita ni agenda."
+          : "🚫 Prueba completada: reconocimos correctamente la cancelación. No se modificó ninguna cita ni agenda.";
+      const sentAt = new Date().toISOString();
+      const metaMessageId = await sendCloudWhatsAppText(TEST_WHATSAPP, body);
+      await saveTestOutboundMessage(relatedMessage.conversation_id, metaMessageId, body, sentAt);
+      return true;
+    }
 
     if (relatedMessage?.sent_at) {
       const { data: relatedAppointments } = await client
@@ -574,10 +645,11 @@ export async function handleAppointmentConfirmationReply(
     await sendReplyAndSave(
       appointment,
       [
-        `¡Gracias, ${appointment.first_name}! Tu cita ha quedado confirmada ✅`,
+        `¡Gracias, ${appointment.first_name}! Tu cita quedó confirmada ✅`,
         `📍 Sucursal ${BRANCH_SHORT_NAMES[branchCode]}`,
         `📅 ${formatDate(appointment.appointment_date)}`,
         `🕐 ${formatTime(appointment.appointment_time)}`,
+        `🏢 ${location.address}`,
         `🗺️ ${location.mapsUrl}`,
         "Será un gusto recibirte 💚"
       ].join("\n\n")
@@ -594,8 +666,8 @@ export async function handleAppointmentConfirmationReply(
   await sendReplyAndSave(
     appointment,
     intent === "cancel"
-      ? `Gracias por avisarnos, ${appointment.first_name}. Tu horario quedó liberado. Cuando desees agendar nuevamente, quedamos a tus órdenes.`
-      : `Claro, ${appointment.first_name}. Liberamos tu horario actual y en breve te ayudamos a elegir una nueva cita.`
+      ? `Gracias por avisarnos, ${appointment.first_name}. Tu horario quedó liberado.\n\nCuando desees agendar nuevamente, quedamos a tus órdenes 💚`
+      : `Claro, ${appointment.first_name} 💚 Liberamos tu horario actual. Una asesora continuará contigo para ayudarte a elegir una nueva cita.`
   );
   return true;
 }

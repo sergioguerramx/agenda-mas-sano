@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Elige una sucursal y fecha válidas." }, { status: 400 });
   }
   if (branchCode === "MTY_SUR" && date < MTY_SUR_OPENING_DATE) {
-    return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
+    return NextResponse.json({ error: "Monterrey Poniente abre agenda a partir del 3 de agosto." }, { status: 409 });
   }
 
   const client = createSupabaseServiceRoleClient();

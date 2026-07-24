@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { BRANCH_OPENING_DATES, type ActiveBranchCode } from "@/lib/branch-locations";
+import { getMasSanoAppointmentOffer } from "@/lib/mas-sano-pricing";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient, isSupabaseConfigured } from "@/lib/supabase";
 import { buildSlotsForDate } from "@/lib/schedule";
 import { syncContactFromAppointment } from "@/services/contacts";
@@ -205,7 +206,7 @@ export async function POST(request: Request) {
     }
     const openingDate = BRANCH_OPENING_DATES[branchCode];
     if (openingDate && payload.date < openingDate) {
-      return NextResponse.json({ error: "Monterrey Sur abre agenda a partir del 3 de agosto." }, { status: 409 });
+      return NextResponse.json({ error: "Monterrey Poniente abre agenda a partir del 3 de agosto." }, { status: 409 });
     }
 
     const normalizedTime = payload.time.slice(0, 5);
@@ -404,6 +405,23 @@ export async function POST(request: Request) {
 
       row = appointment as AppointmentRow;
       const adOrigin = normalizeAdOrigin(payload.adOrigin);
+      const appointmentOffer = getMasSanoAppointmentOffer(payload.date);
+
+      if (row.id && row.service !== appointmentOffer.service) {
+        const { error: serviceError } = await adminSupabase
+          .from("appointments")
+          .update({ service: appointmentOffer.service })
+          .eq("id", row.id);
+
+        if (serviceError) {
+          logAutomationWarning("Appointment service update warning", serviceError, {
+            appointmentId: row.id,
+            service: appointmentOffer.service
+          });
+        } else {
+          row = { ...row, service: appointmentOffer.service };
+        }
+      }
 
       if (row.id && row.origin !== adOrigin) {
         const { error: originError } = await adminSupabase

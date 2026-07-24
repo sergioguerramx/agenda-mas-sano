@@ -95,7 +95,7 @@ begin
 
   contact_branch := case
     when appointment_record.modality = 'online' then 'Online'
-    when appointment_record.branch_code = 'MTY_SUR' then 'Monterrey Sur'
+    when appointment_record.branch_code = 'MTY_SUR' then 'Monterrey Poniente'
     else 'San Nicolás'
   end;
 

@@ -77,6 +77,7 @@ async function saveIncomingMessage(value: MetaValue, message: MetaMessage) {
       last_message_at: sentAt,
       last_message_preview: body.slice(0, 180),
       last_message_direction: 1,
+      follow_up_at: null,
       updated_at: new Date().toISOString()
     }, { onConflict: "whatsapp" })
     .select("id, unread_count")
